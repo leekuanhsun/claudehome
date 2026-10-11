@@ -294,7 +294,7 @@
     const url = URL.createObjectURL(new Blob([C.toCsv(list)], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `支出紀錄_${m}.csv`;
+    a.download = `expenses-${m}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
