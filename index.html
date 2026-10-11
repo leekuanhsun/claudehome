@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#7565c8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="存錢計畫">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<title>每月存錢計畫｜我的預算小管家</title>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div>
+      <h1>存錢不是限制，是替未來多留一點選擇 ♡</h1>
+      <p>每天記一筆，慢慢把預算變成看得見的安心感。<br>資料只保存在這台裝置的瀏覽器中。</p>
+    </div>
+    <div class="cat" aria-hidden="true">🐈‍⬛ ✨</div>
+  </header>
+
+  <section class="metrics" aria-label="每月財務總覽">
+    <div class="card metric"><div class="label">每月實領薪水</div><div class="value" id="incomeView">—</div></div>
+    <div class="card metric"><div class="label">固定貸款</div><div class="value" id="loanView">—</div></div>
+    <div class="card metric"><div class="label">工作日生活費預算</div><div class="value" id="dailyBudgetView">—</div></div>
+    <div class="card metric"><div class="label">朋友聚會（每月）</div><div class="value" id="outingView">—</div></div>
+    <div class="card metric"><div class="label">信用卡分期（月付）</div><div class="value" id="cardView">—</div></div>
+  </section>
+
+  <section class="card panel" aria-labelledby="leftTitle">
+    <div class="split">
+      <div>
+        <h2 id="leftTitle">本月可分配金額</h2>
+        <div class="big" id="leftoverView">—</div>
+        <p class="hint">計算方式：實領薪水 − 固定貸款 − 生活費預算 − 聚會預算 − 信用卡分期</p>
+        <p class="warn" id="leftoverWarn" hidden>⚠ 固定支出已超過實領薪水，建議調整設定。</p>
+      </div>
+      <button class="ghost" id="editBudgetBtn" type="button" aria-expanded="false" aria-controls="settingsForm">調整預算設定</button>
+    </div>
+
+    <form id="settingsForm" class="editor" novalidate hidden>
+      <div class="form-grid">
+        <div class="field"><label for="income">每月實領薪水</label><input id="income" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+        <div class="field"><label for="loan">每月固定貸款</label><input id="loan" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+        <div class="field"><label for="workdays">每月工作日</label><input id="workdays" type="number" inputmode="numeric" min="0" max="31" step="1" required></div>
+        <div class="field"><label for="dailyLimit">每日生活費上限</label><input id="dailyLimit" type="number" inputmode="decimal" min="0" max="1000000" step="50" required></div>
+        <div class="field"><label for="outing">每月朋友聚會預算</label><input id="outing" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+        <div class="field"><label for="cardPay">信用卡分期月付</label><input id="cardPay" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+        <div class="field"><label for="cardBalance">信用卡分期剩餘本金（約）</label><input id="cardBalance" type="number" inputmode="decimal" min="0" max="100000000" step="500" required></div>
+      </div>
+      <p class="hint">未計入分期利息。若本金為 0，系統會視為已繳清，不再扣除月付金額。</p>
+      <div class="actions">
+        <button class="ghost" id="resetSettings" type="button">還原預設</button>
+        <button class="ghost" id="cancelSettings" type="button">取消</button>
+        <button type="submit">儲存設定</button>
+      </div>
+    </form>
+  </section>
+
+  <div class="layout">
+    <section class="card panel" aria-labelledby="addTitle">
+      <h2 id="addTitle">＋ 新增支出</h2>
+      <form id="expenseForm" class="form-grid" novalidate>
+        <div class="field"><label for="expenseDate">日期</label><input id="expenseDate" type="date" required></div>
+        <div class="field"><label for="expenseAmount">金額（元）</label><input id="expenseAmount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="例如：185" required></div>
+        <div class="field"><label for="expenseCategory">類別</label><select id="expenseCategory"></select></div>
+        <div class="field"><label for="expenseNote">備註（選填）</label><input id="expenseNote" type="text" maxlength="80" placeholder="例如：午餐、捷運"></div>
+        <div class="field full">
+          <span class="label-s">快速金額</span>
+          <div class="chips">
+            <button class="chip" type="button" data-amt="50">50</button>
+            <button class="chip" type="button" data-amt="100">100</button>
+            <button class="chip" type="button" data-amt="150">150</button>
+            <button class="chip" type="button" data-amt="200">200</button>
+            <button class="chip" type="button" data-amt="300">300</button>
+          </div>
+        </div>
+        <button class="full" type="submit">記錄支出</button>
+      </form>
+
+      <div class="budget-box">
+        <div class="bold">所選日期的生活費</div>
+        <div class="prog-row"><span id="daySpentLabel">已花 $0</span><span id="dayRemainLabel">剩餘 $0</span></div>
+        <div class="bar"><span id="dayBar"></span></div>
+        <div class="hint" id="dayHint"></div>
+      </div>
+    </section>
+
+    <section class="card panel" aria-labelledby="monthTitle">
+      <h2 id="monthTitle">本月支出進度</h2>
+      <div class="monthnav">
+        <button class="ghost sm" id="prevMonth" type="button" aria-label="上個月">‹</button>
+        <input id="monthPicker" type="month" aria-label="查看月份">
+        <button class="ghost sm" id="nextMonth" type="button" aria-label="下個月">›</button>
+      </div>
+      <button class="link" id="thisMonth" type="button">回到本月</button>
+
+      <div class="prog">
+        <div class="prog-row"><span>生活費（不含聚會）</span><strong id="monthSpentLabel">$0</strong></div>
+        <div class="bar"><span id="monthBar"></span></div>
+        <div class="prog-foot"><span id="monthRemainLabel">—</span><span id="monthPercent">0%</span></div>
+
+        <div class="prog-row"><span>朋友聚會</span><strong id="outingSpentLabel">$0</strong></div>
+        <div class="bar"><span id="outingBar"></span></div>
+      </div>
+
+      <div class="budget-box plain">
+        <div class="bold">本月支出總計</div>
+        <div id="monthTotal" class="total">$0</div>
+        <div id="catBreakdown"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card panel" aria-labelledby="listTitle">
+    <div class="row-head">
+      <h2 id="listTitle" class="flush">支出明細</h2>
+      <button class="ghost" id="exportBtn" type="button">匯出 CSV</button>
+    </div>
+    <div class="table-wrap spaced">
+      <table>
+        <thead><tr><th>日期</th><th>類別</th><th>備註</th><th class="amount">金額</th><th>操作</th></tr></thead>
+        <tbody id="expenseRows"></tbody>
+      </table>
+      <div id="emptyState" class="empty">這個月還沒有支出紀錄，記下第一筆吧 ✨</div>
+    </div>
+  </section>
+
+  <section class="card panel" aria-labelledby="planTitle">
+    <h2 id="planTitle">存錢路線圖</h2>
+    <div class="goals">
+      <div class="goal">
+        <span class="pill">第 1 階段：分期中</span>
+        <strong id="stage1Save">—</strong>
+        <div class="hint" id="stage1Hint"></div>
+      </div>
+      <div class="goal">
+        <span class="pill">第 2 階段：分期結束後</span>
+        <strong id="stage2Save">—</strong>
+        <div class="hint" id="stage2Hint"></div>
+      </div>
+      <div class="goal">
+        <span class="pill">未來 12 個月存款估算</span>
+        <strong id="yearEstimate">—</strong>
+        <div class="hint" id="yearHint"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">每一筆記錄，都是更接近目標的一小步 ♡</div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
