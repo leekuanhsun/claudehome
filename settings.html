@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6f5fd0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<title>預算設定｜每月存錢計畫</title>
+</head>
+<body data-page="settings">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">💰 存錢計畫</a>
+    <nav class="tabs" aria-label="主要頁面">
+      <a href="index.html" data-tab="overview"><span aria-hidden="true">🏠</span>總覽</a>
+      <a href="expense.html" data-tab="expense"><span aria-hidden="true">✏️</span>記帳</a>
+      <a href="history.html" data-tab="history"><span aria-hidden="true">📋</span>明細</a>
+      <a href="plan.html" data-tab="plan"><span aria-hidden="true">🌱</span>存錢計畫</a>
+      <a href="settings.html" data-tab="settings" aria-current="page"><span aria-hidden="true">⚙️</span>設定</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page narrow">
+  <div class="page-head">
+    <h1>預算設定</h1>
+    <p>儲存後，總覽與存錢計畫會自動更新。</p>
+  </div>
+
+  <form class="card" id="setForm" novalidate>
+    <h2>收入與固定支出</h2>
+    <div class="form-grid">
+      <div class="field"><label for="income">每月實領薪水</label><input id="income" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+      <div class="field"><label for="loan">每月固定貸款</label><input id="loan" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+      <div class="field"><label for="cardPay">信用卡分期月付</label><input id="cardPay" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+      <div class="field"><label for="cardBalance">信用卡分期剩餘本金（約）</label><input id="cardBalance" type="number" inputmode="decimal" min="0" max="100000000" step="500" required></div>
+    </div>
+    <p class="hint">未計入分期利息。若本金為 0，系統會視為已繳清，不再扣除月付金額。</p>
+
+    <h2 class="mt">生活費與聚會</h2>
+    <div class="form-grid">
+      <div class="field"><label for="workdays">每月工作日</label><input id="workdays" type="number" inputmode="numeric" min="0" max="31" step="1" required></div>
+      <div class="field"><label for="dailyLimit">每日生活費上限</label><input id="dailyLimit" type="number" inputmode="decimal" min="0" max="1000000" step="50" required></div>
+      <div class="field"><label for="outing">每月朋友聚會預算</label><input id="outing" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn ghost" id="setReset" type="button">還原預設</button>
+      <button class="btn" type="submit">儲存設定</button>
+    </div>
+  </form>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

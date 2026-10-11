@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6f5fd0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<title>存錢計畫｜每月存錢計畫</title>
+</head>
+<body data-page="plan">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">💰 存錢計畫</a>
+    <nav class="tabs" aria-label="主要頁面">
+      <a href="index.html" data-tab="overview"><span aria-hidden="true">🏠</span>總覽</a>
+      <a href="expense.html" data-tab="expense"><span aria-hidden="true">✏️</span>記帳</a>
+      <a href="history.html" data-tab="history"><span aria-hidden="true">📋</span>明細</a>
+      <a href="plan.html" data-tab="plan" aria-current="page"><span aria-hidden="true">🌱</span>存錢計畫</a>
+      <a href="settings.html" data-tab="settings"><span aria-hidden="true">⚙️</span>設定</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>存錢計畫</h1>
+    <p>依照目前的預算設定，估算接下來的存款節奏。</p>
+  </div>
+
+  <section class="grid g3">
+    <div class="card">
+      <span class="tag">第 1 階段・分期中</span>
+      <div class="big" id="planStage1">—</div>
+      <p class="muted" id="planStage1Note"></p>
+    </div>
+    <div class="card">
+      <span class="tag">第 2 階段・分期結束後</span>
+      <div class="big" id="planStage2">—</div>
+      <p class="muted" id="planStage2Note"></p>
+    </div>
+    <div class="card">
+      <span class="tag">未來 12 個月</span>
+      <div class="big" id="planYear">—</div>
+      <p class="muted" id="planYearNote"></p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>12 個月存款表</h2>
+    <p class="muted">未計利息與其他變動項目，僅供估算。</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>月份</th><th class="amount">每月存款</th><th class="amount">累計存款</th></tr></thead>
+        <tbody id="planRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="muted center">想調整數字？<a class="link" href="settings.html">前往預算設定 →</a></p>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

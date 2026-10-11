@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6f5fd0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<title>支出明細｜每月存錢計畫</title>
+</head>
+<body data-page="history">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">💰 存錢計畫</a>
+    <nav class="tabs" aria-label="主要頁面">
+      <a href="index.html" data-tab="overview"><span aria-hidden="true">🏠</span>總覽</a>
+      <a href="expense.html" data-tab="expense"><span aria-hidden="true">✏️</span>記帳</a>
+      <a href="history.html" data-tab="history" aria-current="page"><span aria-hidden="true">📋</span>明細</a>
+      <a href="plan.html" data-tab="plan"><span aria-hidden="true">🌱</span>存錢計畫</a>
+      <a href="settings.html" data-tab="settings"><span aria-hidden="true">⚙️</span>設定</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head row">
+    <div>
+      <h1>支出明細</h1>
+      <p>查看每月的花費與分類。</p>
+    </div>
+    <div class="monthnav">
+      <button class="btn ghost sm" id="histPrev" type="button" aria-label="上個月">‹</button>
+      <input id="histPicker" type="month" aria-label="查看月份">
+      <button class="btn ghost sm" id="histNext" type="button" aria-label="下個月">›</button>
+      <button class="link-btn" id="histThis" type="button">回到本月</button>
+    </div>
+  </div>
+
+  <section class="grid g3">
+    <div class="card stat"><div class="label">生活費（不含聚會）</div><div class="value" id="sumLife">—</div></div>
+    <div class="card stat"><div class="label">朋友聚會</div><div class="value" id="sumOuting">—</div></div>
+    <div class="card stat"><div class="label">本月支出總計</div><div class="value" id="sumTotal">—</div></div>
+  </section>
+
+  <section class="grid g2">
+    <div class="card">
+      <h2>進度</h2>
+      <div class="row small"><span id="lifeText">—</span><span id="lifePct">0%</span></div>
+      <div class="bar"><span id="lifeBar"></span></div>
+      <div class="row small"><span>朋友聚會</span><span id="outingText">—</span></div>
+      <div class="bar"><span id="outingBar"></span></div>
+    </div>
+    <div class="card">
+      <h2>分類</h2>
+      <div id="catBreakdown"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <h2>明細</h2>
+      <button class="btn ghost" id="exportBtn" type="button">匯出 CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>日期</th><th>類別</th><th>備註</th><th class="amount">金額</th><th>操作</th></tr></thead>
+        <tbody id="histRows"></tbody>
+      </table>
+      <div id="histEmpty" class="empty">這個月還沒有支出紀錄 ✨<br><a class="link" href="expense.html">去記一筆 →</a></div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

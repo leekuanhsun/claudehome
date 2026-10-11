@@ -18,14 +18,26 @@
 npm start   # 在 http://localhost:8000 開啟
 ```
 
+## 頁面
+
+| 頁面 | 檔案 | 內容 |
+| --- | --- | --- |
+| 總覽 | `index.html` | 本月可分配金額、各項預算、今日與本月進度、存錢路線摘要 |
+| 記帳 | `expense.html` | 新增支出、快速金額、當日紀錄 |
+| 明細 | `history.html` | 月份切換、生活費與聚會進度、分類統計、支出列表、匯出 CSV |
+| 存錢計畫 | `plan.html` | 兩階段存款估算、未來 12 個月存款表 |
+| 設定 | `settings.html` | 收入、固定支出、生活費與聚會預算 |
+
+各頁面頂部有導覽列（手機版改為底部導覽列），頁面內也有連結可跳到相關頁面。
+
 ## 檔案結構
 
 | 檔案 | 說明 |
 | --- | --- |
-| `index.html` | 頁面結構 |
-| `styles.css` | 樣式 |
+| `*.html` | 五個頁面的結構 |
+| `styles.css` | 共用樣式與響應式版面 |
 | `calc.js` | 計算邏輯（不碰 DOM，可單獨測試） |
-| `app.js` | 畫面渲染與互動、localStorage 存取 |
+| `app.js` | 共用儲存、各頁面的渲染與互動（依 `body[data-page]` 啟動） |
 | `sw.js` | Service Worker，離線快取 |
 | `manifest.webmanifest`、`icon.svg` | 加入主畫面用的設定與圖示 |
 | `tests/calc.test.js` | 計算邏輯的單元測試 |
