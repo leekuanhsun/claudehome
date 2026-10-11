@@ -1,0 +1,13 @@
+{
+  "name": "每月存錢計畫",
+  "short_name": "存錢計畫",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f1ff",
+  "theme_color": "#7565c8",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

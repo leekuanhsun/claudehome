@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6f5fd0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="存錢計畫">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<title>總覽｜每月存錢計畫</title>
+</head>
+<body data-page="overview">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">💰 存錢計畫</a>
+    <nav class="tabs" aria-label="主要頁面">
+      <a href="index.html" data-tab="overview" aria-current="page"><span aria-hidden="true">🏠</span>總覽</a>
+      <a href="expense.html" data-tab="expense"><span aria-hidden="true">✏️</span>記帳</a>
+      <a href="history.html" data-tab="history"><span aria-hidden="true">📋</span>明細</a>
+      <a href="plan.html" data-tab="plan"><span aria-hidden="true">🌱</span>存錢計畫</a>
+      <a href="settings.html" data-tab="settings"><span aria-hidden="true">⚙️</span>設定</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>本月存錢總覽</h1>
+    <p>一眼看懂這個月還能存多少。資料只保存在這台裝置的瀏覽器中。</p>
+  </div>
+
+  <section class="card hero">
+    <div>
+      <div class="muted">本月可分配金額</div>
+      <div class="hero-num" id="ovLeftover">—</div>
+      <p class="muted">實領薪水 − 固定貸款 − 生活費預算 − 聚會預算 − 信用卡分期</p>
+      <p class="warn" id="ovWarn" hidden>⚠ 固定支出已超過實領薪水，建議到設定頁調整。</p>
+    </div>
+    <a class="btn ghost" href="settings.html">調整預算設定</a>
+  </section>
+
+  <section class="grid g4">
+    <div class="card stat"><div class="label">每月實領薪水</div><div class="value" id="ovIncome">—</div></div>
+    <div class="card stat"><div class="label">固定與預算支出</div><div class="value" id="ovFixed">—</div></div>
+    <div class="card stat"><div class="label">生活費預算</div><div class="value" id="ovDaily">—</div></div>
+    <div class="card stat"><div class="label">信用卡分期月付</div><div class="value" id="ovCard">—</div></div>
+  </section>
+
+  <section class="grid g2">
+    <div class="card">
+      <div class="row"><h2>今天的生活費</h2><a class="link" href="expense.html">記一筆 →</a></div>
+      <div class="row small"><span id="ovTodayText">—</span></div>
+      <div class="bar"><span id="ovTodayBar"></span></div>
+    </div>
+    <div class="card">
+      <div class="row"><h2>本月生活費</h2><a class="link" href="history.html">看明細 →</a></div>
+      <div class="row small"><span id="ovMonthText">—</span></div>
+      <div class="bar"><span id="ovMonthBar"></span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2>存錢路線</h2><a class="link" href="plan.html">看完整計畫 →</a></div>
+    <div class="grid g2">
+      <div class="mini">
+        <span class="tag">第 1 階段・分期中</span>
+        <strong id="ovStage1">—</strong>
+        <span class="muted" id="ovStage1Note"></span>
+      </div>
+      <div class="mini">
+        <span class="tag">第 2 階段・分期結束後</span>
+        <strong id="ovStage2">—</strong>
+        <span class="muted" id="ovStage2Note"></span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
