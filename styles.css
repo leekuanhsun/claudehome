@@ -178,6 +178,10 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .map-link{color:var(--purple);font-size:13px;font-weight:600;text-decoration:none;margin-left:4px}
 .map-link:hover{text-decoration:underline}
 
+/* ---------- 雲端同步 ---------- */
+.cloud-form{display:grid;gap:12px;margin-top:12px}
+.cloud-form .actions{margin-top:0;justify-content:flex-start}
+
 /* ---------- 記帳／日記切換 ---------- */
 .seg{
   display:grid;grid-template-columns:1fr 1fr;gap:4px;

@@ -9,6 +9,8 @@
     expenses: 'savingPlan.v2.expenses',
     diary: 'savingPlan.v2.diary',
     tags: 'savingPlan.v2.tags',
+    tombstones: 'savingPlan.v2.tombstones',
+    meta: 'savingPlan.v2.meta',
   };
   const LEGACY = { settings: 'savingPlanSettings', expenses: 'savingPlanExpenses' };
   const page = document.body.dataset.page;
@@ -17,6 +19,10 @@
   let expenses = [];
   let diary = [];
   let customTags = {};
+  // 刪除記錄：{ expenses: {id: 刪除時間}, diary: {...} }，讓其他裝置同步時也會刪掉
+  let tombstones = { expenses: {}, diary: {} };
+  // 設定與細項最後修改的時間，用來決定同步時哪一份較新
+  let meta = { settingsU: 0, tagsU: 0 };
   let onChange = () => {};
   let onDiaryChange = () => {};
 
@@ -123,31 +129,158 @@
     customTags = C.sanitizeCustomTags(readJSON([KEYS.tags], {}));
     const storedDiary = readJSON([KEYS.diary], []);
     diary = Array.isArray(storedDiary) ? storedDiary.filter(C.isValidDiary) : [];
+    tombstones = readJSON([KEYS.tombstones], { expenses: {}, diary: {} });
+    meta = { settingsU: 0, tagsU: 0, ...readJSON([KEYS.meta], {}) };
+  }
+
+  // 只寫入本機，不觸發同步
+  function writeLocal() {
+    localStorage.setItem(KEYS.settings, JSON.stringify(settings));
+    localStorage.setItem(KEYS.expenses, JSON.stringify(expenses));
+    localStorage.setItem(KEYS.diary, JSON.stringify(diary));
+    localStorage.setItem(KEYS.tags, JSON.stringify(customTags));
+    localStorage.setItem(KEYS.tombstones, JSON.stringify(tombstones));
+    localStorage.setItem(KEYS.meta, JSON.stringify(meta));
   }
 
   function save() {
     try {
-      localStorage.setItem(KEYS.settings, JSON.stringify(settings));
-      localStorage.setItem(KEYS.expenses, JSON.stringify(expenses));
-      localStorage.setItem(KEYS.diary, JSON.stringify(diary));
-      localStorage.setItem(KEYS.tags, JSON.stringify(customTags));
-      return true;
+      writeLocal();
     } catch {
       toast('無法儲存資料，請確認瀏覽器儲存空間或是否在無痕模式');
       return false;
     }
+    scheduleSync();
+    return true;
+  }
+
+  /* ---------- 雲端同步 ---------- */
+
+  let syncTimer = null;
+  let syncRunning = false;
+  let syncQueued = false;
+
+  const cloudReady = () => !!(window.SavingPlanCloud && window.SavingPlanCloud.configured);
+
+  function setSyncStatus(msg) {
+    const el = $('syncStatus');
+    if (el) el.textContent = msg;
+  }
+
+  function toDoc() {
+    return {
+      expenses,
+      diary,
+      tombstones,
+      settings: { u: meta.settingsU || 0, v: settings },
+      tags: { u: meta.tagsU || 0, v: customTags },
+    };
+  }
+
+  // 把合併後的文件套用到本機
+  function applyDoc(doc) {
+    expenses = (doc.expenses || []).filter(C.isValidExpense);
+    diary = (doc.diary || []).filter(C.isValidDiary);
+    tombstones = doc.tombstones || { expenses: {}, diary: {} };
+    settings = C.sanitizeSettings(doc.settings && doc.settings.v);
+    customTags = C.sanitizeCustomTags(doc.tags && doc.tags.v);
+    meta = { settingsU: (doc.settings && doc.settings.u) || 0, tagsU: (doc.tags && doc.tags.u) || 0 };
+    writeLocal();
+  }
+
+  function scheduleSync() {
+    if (!cloudReady()) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncNow, 1500);
+  }
+
+  // 讀取雲端 → 與本機合併 → 寫回雲端
+  async function syncNow() {
+    if (!cloudReady()) return;
+    if (syncRunning) {
+      syncQueued = true;
+      return;
+    }
+    syncRunning = true;
+    try {
+      const user = await SavingPlanCloud.currentUser();
+      if (!user) {
+        setSyncStatus('尚未登入，資料只存在這台裝置。');
+        return;
+      }
+      setSyncStatus('同步中…');
+      const remote = await SavingPlanCloud.fetchDoc(user);
+      applyDoc(C.mergeDocs(toDoc(), remote || C.emptyDoc()));
+      await SavingPlanCloud.pushDoc(user, toDoc());
+      const time = new Date().toLocaleTimeString('zh-Hant', { hour: '2-digit', minute: '2-digit' });
+      setSyncStatus(`已同步（${time}）`);
+      onChange();
+      onDiaryChange();
+    } catch (e) {
+      setSyncStatus('同步失敗：' + (e && e.message ? e.message : '請稍後再試'));
+    } finally {
+      syncRunning = false;
+      if (syncQueued) {
+        syncQueued = false;
+        scheduleSync();
+      }
+    }
+  }
+
+  function initCloudPanel() {
+    const render = async () => {
+      if (!cloudReady()) {
+        $('loginForm').hidden = true;
+        $('signedIn').hidden = true;
+        setSyncStatus('尚未設定雲端同步：請編輯 supabase-config.js，填入 Supabase 的網址與金鑰。');
+        return;
+      }
+      const user = await SavingPlanCloud.currentUser();
+      $('loginForm').hidden = !!user;
+      $('signedIn').hidden = !user;
+      if (user) {
+        $('signedEmail').textContent = user.email;
+        setSyncStatus('已登入，手機與電腦的資料會同步。');
+      } else {
+        setSyncStatus('登入後，手機與電腦的資料會同步。');
+      }
+    };
+
+    $('loginForm').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const email = $('loginEmail').value.trim();
+      if (!email) {
+        toast('請輸入 email');
+        return;
+      }
+      try {
+        await SavingPlanCloud.signIn(email);
+        toast('登入連結已寄出，請到信箱點擊');
+        setSyncStatus('登入連結已寄到信箱，點擊後會回到這裡。');
+      } catch (e) {
+        toast('寄送失敗：' + e.message);
+      }
+    });
+    $('syncNowBtn').onclick = () => syncNow();
+    $('logoutBtn').onclick = async () => {
+      await SavingPlanCloud.signOut();
+      toast('已登出，資料仍保留在這台裝置');
+      render();
+    };
+    render();
   }
 
   function removeExpense(id) {
     const e = expenses.find(x => x.id === id);
     if (!e || !confirm(`確定刪除這筆 ${money(e.amount)}（${e.category}）？`)) return;
-    const prev = expenses;
+    const prev = { expenses, tombstones };
     expenses = expenses.filter(x => x.id !== id);
+    tombstones = { ...tombstones, expenses: { ...tombstones.expenses, [id]: Date.now() } };
     if (save()) {
       toast('已刪除');
       onChange();
     } else {
-      expenses = prev;
+      ({ expenses, tombstones } = prev);
     }
   }
 
@@ -290,6 +423,7 @@
     }
     const prev = customTags;
     customTags = res.customTags;
+    meta = { ...meta, tagsU: Date.now() };
     if (!save()) {
       customTags = prev;
       return;
@@ -306,6 +440,7 @@
     if (!confirm(`移除「${name}」？已記錄的支出不會受影響。`)) return;
     const prev = customTags;
     customTags = C.removeCustomTag(customTags, category, name);
+    meta = { ...meta, tagsU: Date.now() };
     if (!save()) {
       customTags = prev;
       return;
@@ -392,13 +527,14 @@
   function removeDiary(id) {
     const e = diary.find(x => x.id === id);
     if (!e || !confirm(`確定刪除 ${e.date} 的日記？`)) return;
-    const prev = diary;
+    const prev = { diary, tombstones };
     diary = diary.filter(x => x.id !== id);
+    tombstones = { ...tombstones, diary: { ...tombstones.diary, [id]: Date.now() } };
     if (save()) {
       toast('已刪除');
       onDiaryChange();
     } else {
-      diary = prev;
+      ({ diary, tombstones } = prev);
     }
   }
 
@@ -496,6 +632,7 @@
           $(res.field === 'date' ? 'diaryDate' : 'diaryText').focus();
           return;
         }
+        res.entry.u = Date.now();
         diary.push(res.entry);
         if (!save()) {
           diary.pop();
@@ -582,6 +719,7 @@
           $(res.field === 'date' ? 'expDate' : 'expAmount').focus();
           return;
         }
+        res.expense.u = Date.now();
         expenses.push(res.expense);
         if (!save()) {
           expenses.pop();
@@ -727,6 +865,8 @@
       for (const k of Object.keys(C.DEFAULTS)) $(k).value = settings[k];
     };
     fill();
+    onChange = fill;
+    initCloudPanel();
 
     $('setReset').onclick = () => {
       for (const k of Object.keys(C.DEFAULTS)) $(k).value = C.DEFAULTS[k];
@@ -745,6 +885,7 @@
       }
       const prev = settings;
       settings = res.values;
+      meta = { ...meta, settingsU: Date.now() };
       if (!save()) {
         settings = prev;
         return;
@@ -766,6 +907,12 @@
 
   load();
   if (INITS[page]) INITS[page]();
+
+  // 開啟任何頁面時同步一次；切回這個分頁時也同步
+  if (cloudReady()) syncNow();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncNow();
+  });
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

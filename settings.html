@@ -53,9 +53,28 @@
       <button class="btn" type="submit">儲存設定</button>
     </div>
   </form>
+
+  <section class="card" id="cloudBox">
+    <h2>雲端同步</h2>
+    <p class="muted" id="syncStatus">檢查中…</p>
+    <form id="loginForm" class="cloud-form" novalidate hidden>
+      <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email"></div>
+      <button class="btn" type="submit">寄送登入連結</button>
+    </form>
+    <div id="signedIn" class="cloud-form" hidden>
+      <p class="muted">已登入：<strong id="signedEmail"></strong></p>
+      <div class="actions">
+        <button class="btn ghost" id="syncNowBtn" type="button">立即同步</button>
+        <button class="btn ghost" id="logoutBtn" type="button">登出</button>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="sync.js"></script>
 <script src="calc.js"></script>
 <script src="app.js"></script>
 </body>
