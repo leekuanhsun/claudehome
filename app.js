@@ -243,41 +243,29 @@
   function initCloudPanel() {
     const render = () => {
       const user = SavingPlanCloud.currentUser();
-      $('serverUrl').value = SavingPlanCloud.serverUrl;
       $('loginForm').hidden = !!user || !cloudReady();
       $('signedIn').hidden = !user;
       if (user) {
         $('signedUser').textContent = user.username;
         setSyncStatus('已登入，手機與電腦的資料會同步。');
       } else if (!cloudReady()) {
-        setSyncStatus('在 GitHub Pages 上使用時，請先填入伺服器網址（例如 Mac 上的 Tailscale 網址）。');
+        setSyncStatus('尚未設定雲端同步：請在 supabase-config.js 填入 Supabase 的網址。');
       } else {
         setSyncStatus('登入後，手機與電腦的資料會同步。');
       }
     };
 
-    $('serverForm').addEventListener('submit', ev => {
-      ev.preventDefault();
-      try {
-        SavingPlanCloud.setServer($('serverUrl').value);
-        toast('伺服器網址已儲存');
-        render();
-      } catch (e) {
-        toast(e.message);
-      }
-    });
-
     $('loginForm').addEventListener('submit', async ev => {
       ev.preventDefault();
-      const username = $('loginUser').value.trim();
+      const email = $('loginUser').value.trim();
       const password = $('loginPass').value;
-      if (!username || !password) {
-        toast('請輸入帳號與密碼');
+      if (!email || !password) {
+        toast('請輸入電子郵件與密碼');
         return;
       }
       try {
         setSyncStatus('登入中…');
-        await SavingPlanCloud.signIn(username, password);
+        await SavingPlanCloud.signIn(email, password);
         $('loginPass').value = '';
         toast('登入成功');
         render();
