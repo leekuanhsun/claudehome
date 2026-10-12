@@ -204,8 +204,42 @@
     return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
   }
 
+  /* ---------- 日記 ---------- */
+
+  const MOODS = ['😊', '🎉', '😔', '🥳', '🥰', '😄', '😌', '😤'];
+  const MAX_DIARY_PHOTOS = 4;
+  const MAX_DIARY_TEXT = 1000;
+
+  function buildDiary(input, id) {
+    const date = String(input.date || '');
+    if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
+
+    const text = String(input.text || '').trim().slice(0, MAX_DIARY_TEXT);
+    const photos = (input.photos || []).filter(validPhoto).slice(0, MAX_DIARY_PHOTOS);
+    if (!text && !photos.length) return { ok: false, field: 'text', message: '請寫一點內容或加一張照片' };
+
+    const mood = MOODS.includes(input.mood) ? input.mood : null;
+    return { ok: true, entry: { id, date, mood, text, photos, location: validLocation(input.location) } };
+  }
+
+  function monthDiary(entries, month) {
+    return entries
+      .filter(e => monthOf(e.date) === month)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  }
+
+  function isValidDiary(e) {
+    return !!e && typeof e.id === 'number' && DATE_RE.test(e.date) && typeof e.text === 'string';
+  }
+
   return {
     DEFAULTS,
+    MOODS,
+    MAX_DIARY_PHOTOS,
+    MAX_DIARY_TEXT,
+    buildDiary,
+    monthDiary,
+    isValidDiary,
     LIMITS,
     LABELS,
     CATEGORIES,

@@ -217,6 +217,46 @@ test('toCsv：餐別以頓號串接，舊資料沒有餐別也不會出錯', () 
   assert.ok(csv.includes('"2026-10-02","交通","","old","20"'));
 });
 
+test('buildDiary：心情只接受固定選項，沒選就是 null', () => {
+  assert.equal(C.buildDiary({ date: '2026-10-12', mood: '😊', text: 'hi' }, 1).entry.mood, '😊');
+  assert.equal(C.buildDiary({ date: '2026-10-12', mood: 'x', text: 'hi' }, 1).entry.mood, null);
+  assert.equal(C.buildDiary({ date: '2026-10-12', text: 'hi' }, 1).entry.mood, null);
+});
+
+test('buildDiary：內容或照片至少要有一樣', () => {
+  const empty = C.buildDiary({ date: '2026-10-12', text: '   ' }, 1);
+  assert.equal(empty.ok, false);
+  assert.equal(empty.field, 'text');
+  const photoOnly = C.buildDiary({ date: '2026-10-12', text: '', photos: [PNG] }, 1);
+  assert.equal(photoOnly.ok, true);
+});
+
+test('buildDiary：照片最多 4 張，內容最多 1000 字', () => {
+  const r = C.buildDiary({
+    date: '2026-10-12', text: 'x'.repeat(1200),
+    photos: [PNG, PNG, PNG, PNG, PNG, PNG],
+  }, 1);
+  assert.equal(r.entry.photos.length, C.MAX_DIARY_PHOTOS);
+  assert.equal(r.entry.text.length, C.MAX_DIARY_TEXT);
+});
+
+test('buildDiary：日期格式錯誤會被拒絕', () => {
+  const r = C.buildDiary({ date: '2026/10/12', text: 'hi' }, 1);
+  assert.equal(r.ok, false);
+  assert.equal(r.field, 'date');
+});
+
+test('monthDiary：只取指定月份，且最新的在前', () => {
+  const entries = [
+    { id: 1, date: '2026-10-01', text: 'a' },
+    { id: 2, date: '2026-10-12', text: 'b' },
+    { id: 3, date: '2026-09-30', text: 'c' },
+    { id: 4, date: '2026-10-12', text: 'd' },
+  ];
+  const list = C.monthDiary(entries, '2026-10');
+  assert.deepEqual(list.map(e => e.id), [4, 2, 1]);
+});
+
 function pick(r) {
   return r.ok ? [] : [r.field];
 }

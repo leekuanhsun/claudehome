@@ -30,6 +30,12 @@
     <p>選好日期、金額與類別，按下記錄即可。</p>
   </div>
 
+  <div class="seg" role="tablist" aria-label="切換記帳與日記">
+    <button type="button" id="segExpense" role="tab" aria-selected="true">記帳</button>
+    <button type="button" id="segDiary" role="tab" aria-selected="false">日記</button>
+  </div>
+
+  <div id="expenseView">
   <section class="grid expense-layout">
     <form class="card" id="expForm" novalidate>
       <div class="form-grid">
@@ -91,6 +97,49 @@
       <div id="dayEmpty" class="empty">這天還沒有紀錄，記下第一筆吧 ✨</div>
     </div>
   </section>
+  </div>
+
+  <div id="diaryView" hidden>
+    <section class="card">
+      <h2>今天想記點什麼？</h2>
+      <form id="diaryForm" novalidate>
+        <div class="field"><label for="diaryDate">日期</label><input id="diaryDate" type="date" required></div>
+
+        <fieldset class="meal-field">
+          <legend class="label-s">心情（點一下選取，再點取消）</legend>
+          <div class="check-chips" id="moodChips"></div>
+        </fieldset>
+
+        <div class="field">
+          <label for="diaryText">內容</label>
+          <textarea id="diaryText" rows="5" maxlength="1000" placeholder="今天發生了什麼事…"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="diaryPhotos">照片（最多 4 張）</label>
+          <input id="diaryPhotos" type="file" accept="image/*" multiple>
+          <div class="thumbs" id="diaryPreview"></div>
+        </div>
+
+        <label class="check-row"><input id="diaryLocation" type="checkbox"> 附上目前位置</label>
+
+        <button class="btn block" type="submit">寫下這一天</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>時間軸</h2>
+        <div class="monthnav">
+          <button class="btn ghost sm" id="diaryPrev" type="button" aria-label="上個月">‹</button>
+          <input id="diaryPicker" type="month" aria-label="查看月份">
+          <button class="btn ghost sm" id="diaryNext" type="button" aria-label="下個月">›</button>
+        </div>
+      </div>
+      <div id="diaryList"></div>
+      <div id="diaryEmpty" class="empty">這個月還沒有任何紀錄，寫下第一篇吧 ✨</div>
+    </section>
+  </div>
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

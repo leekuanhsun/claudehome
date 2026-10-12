@@ -4,13 +4,19 @@
 
   const C = window.SavingPlanCalc;
   const $ = id => document.getElementById(id);
-  const KEYS = { settings: 'savingPlan.v2.settings', expenses: 'savingPlan.v2.expenses' };
+  const KEYS = {
+    settings: 'savingPlan.v2.settings',
+    expenses: 'savingPlan.v2.expenses',
+    diary: 'savingPlan.v2.diary',
+  };
   const LEGACY = { settings: 'savingPlanSettings', expenses: 'savingPlanExpenses' };
   const page = document.body.dataset.page;
 
   let settings = { ...C.DEFAULTS };
   let expenses = [];
+  let diary = [];
   let onChange = () => {};
+  let onDiaryChange = () => {};
 
   const money = n => (n < 0 ? '−$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
   const todayIso = () => C.toIsoDate(new Date());
@@ -112,12 +118,15 @@
     settings = C.sanitizeSettings(readJSON([KEYS.settings, LEGACY.settings], {}));
     const stored = readJSON([KEYS.expenses, LEGACY.expenses], []);
     expenses = Array.isArray(stored) ? stored.filter(C.isValidExpense) : [];
+    const storedDiary = readJSON([KEYS.diary], []);
+    diary = Array.isArray(storedDiary) ? storedDiary.filter(C.isValidDiary) : [];
   }
 
   function save() {
     try {
       localStorage.setItem(KEYS.settings, JSON.stringify(settings));
       localStorage.setItem(KEYS.expenses, JSON.stringify(expenses));
+      localStorage.setItem(KEYS.diary, JSON.stringify(diary));
       return true;
     } catch {
       toast('無法儲存資料，請確認瀏覽器儲存空間或是否在無痕模式');
@@ -266,9 +275,200 @@
     renderPhotoPreview();
   }
 
+  /* ---------- 日記 ---------- */
+
+  let pendingDiaryPhotos = [];
+
+  // 「記帳｜日記」切換
+  function initSegments() {
+    const views = { expense: $('expenseView'), diary: $('diaryView') };
+    const tabs = { expense: $('segExpense'), diary: $('segDiary') };
+    const show = name => {
+      for (const k of Object.keys(views)) {
+        views[k].hidden = k !== name;
+        tabs[k].setAttribute('aria-selected', String(k === name));
+      }
+    };
+    tabs.expense.onclick = () => show('expense');
+    tabs.diary.onclick = () => show('diary');
+    show('expense');
+  }
+
+  // 縮圖列：填入既有的容器
+  function renderThumbs(box, srcs, alt) {
+    box.textContent = '';
+    for (const src of srcs) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = alt;
+      box.appendChild(img);
+    }
+  }
+
+  function fillMoods() {
+    const box = $('moodChips');
+    box.textContent = '';
+    for (const m of C.MOODS) {
+      const label = document.createElement('label');
+      label.className = 'mood-chip';
+      label.title = '心情';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.name = 'mood';
+      input.value = m;
+      // 心情只能選一個：勾選新的心情時取消其他的
+      input.addEventListener('change', () => {
+        if (!input.checked) return;
+        document.querySelectorAll('input[name=mood]').forEach(i => {
+          if (i !== input) i.checked = false;
+        });
+      });
+      const span = document.createElement('span');
+      span.textContent = m;
+      label.append(input, span);
+      box.appendChild(label);
+    }
+  }
+
+  function resetDiaryForm() {
+    $('diaryDate').value = todayIso();
+    $('diaryText').value = '';
+    $('diaryPhotos').value = '';
+    $('diaryLocation').checked = false;
+    document.querySelectorAll('input[name=mood]').forEach(i => { i.checked = false; });
+    pendingDiaryPhotos = [];
+    renderThumbs($('diaryPreview'), [], '');
+  }
+
+  function removeDiary(id) {
+    const e = diary.find(x => x.id === id);
+    if (!e || !confirm(`確定刪除 ${e.date} 的日記？`)) return;
+    const prev = diary;
+    diary = diary.filter(x => x.id !== id);
+    if (save()) {
+      toast('已刪除');
+      onDiaryChange();
+    } else {
+      diary = prev;
+    }
+  }
+
+  function diaryItem(e) {
+    const art = document.createElement('article');
+    art.className = 'diary-item';
+
+    const head = document.createElement('div');
+    head.className = 'row';
+    const meta = document.createElement('div');
+    meta.className = 'diary-meta';
+    meta.textContent = e.mood ? `${e.date}　${e.mood}` : e.date;
+    const del = document.createElement('button');
+    del.className = 'btn danger-sm';
+    del.type = 'button';
+    del.textContent = '刪除';
+    del.setAttribute('aria-label', `刪除 ${e.date} 的日記`);
+    del.onclick = () => removeDiary(e.id);
+    head.append(meta, del);
+    art.appendChild(head);
+
+    if (e.text) {
+      const p = document.createElement('p');
+      p.className = 'diary-text';
+      p.textContent = e.text;
+      art.appendChild(p);
+    }
+    if (e.photos && e.photos.length) {
+      const thumbs = document.createElement('div');
+      thumbs.className = 'thumbs';
+      renderThumbs(thumbs, e.photos, '日記照片');
+      art.appendChild(thumbs);
+    }
+    if (e.location) {
+      const a = document.createElement('a');
+      a.className = 'map-link';
+      a.href = `https://www.google.com/maps?q=${e.location.lat},${e.location.lng}`;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = '📍 地圖';
+      art.appendChild(a);
+    }
+    return art;
+  }
+
+  function initDiary() {
+    fillMoods();
+    resetDiaryForm();
+    $('diaryPicker').value = todayMonth();
+    const selectedMonth = () => $('diaryPicker').value || todayMonth();
+
+    const renderList = () => {
+      const list = C.monthDiary(diary, selectedMonth());
+      const box = $('diaryList');
+      box.textContent = '';
+      for (const e of list) box.appendChild(diaryItem(e));
+      $('diaryEmpty').hidden = list.length > 0;
+    };
+    onDiaryChange = renderList;
+
+    $('diaryPicker').addEventListener('change', renderList);
+    $('diaryPrev').onclick = () => { $('diaryPicker').value = C.addMonths(selectedMonth(), -1); renderList(); };
+    $('diaryNext').onclick = () => { $('diaryPicker').value = C.addMonths(selectedMonth(), 1); renderList(); };
+
+    $('diaryPhotos').addEventListener('change', async ev => {
+      const files = [...ev.target.files];
+      if (files.length > C.MAX_DIARY_PHOTOS) toast(`最多 ${C.MAX_DIARY_PHOTOS} 張，已取前 ${C.MAX_DIARY_PHOTOS} 張`);
+      pendingDiaryPhotos = [];
+      for (const file of files.slice(0, C.MAX_DIARY_PHOTOS)) {
+        try {
+          pendingDiaryPhotos.push(await compressImage(file));
+        } catch {
+          toast('有一張圖片無法讀取，已略過');
+        }
+      }
+      renderThumbs($('diaryPreview'), pendingDiaryPhotos, '待上傳的照片');
+    });
+
+    $('diaryForm').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const submitBtn = $('diaryForm').querySelector('button[type=submit]');
+      submitBtn.disabled = true;
+      try {
+        const location = $('diaryLocation').checked ? await getLocation() : null;
+        const picked = document.querySelector('input[name=mood]:checked');
+        const res = C.buildDiary({
+          date: $('diaryDate').value,
+          mood: picked ? picked.value : null,
+          text: $('diaryText').value,
+          photos: pendingDiaryPhotos,
+          location,
+        }, newId());
+        if (!res.ok) {
+          toast(res.message);
+          $(res.field === 'date' ? 'diaryDate' : 'diaryText').focus();
+          return;
+        }
+        diary.push(res.entry);
+        if (!save()) {
+          diary.pop();
+          return;
+        }
+        resetDiaryForm();
+        $('diaryPicker').value = C.monthOf(res.entry.date);
+        renderList();
+        toast('已寫下這一天');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    renderList();
+  }
+
   function initExpense() {
     fillCategories($('expCategory'));
     fillMeals();
+    initSegments();
+    initDiary();
     $('expDate').value = todayIso();
 
     const selectedDate = () => $('expDate').value || todayIso();
