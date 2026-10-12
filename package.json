@@ -2,10 +2,13 @@
   "name": "claudehome",
   "version": "1.0.0",
   "private": true,
-  "description": "每月存錢計畫：單頁式預算與存款規劃工具（純前端，資料存在瀏覽器）",
+  "description": "每月存錢計畫：單頁式預算與存款規劃工具，可用本機伺服器在手機與電腦之間同步",
   "scripts": {
     "test": "node --test",
-    "start": "python3 -m http.server 8000"
+    "server": "node server/server.js"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.13"
+  }
 }

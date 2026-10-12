@@ -44,7 +44,9 @@ npm start   # 在 http://localhost:8000 開啟
 | `app.js` | 共用儲存、各頁面的渲染與互動（依 `body[data-page]` 啟動） |
 | `sw.js` | Service Worker，離線快取 |
 | `manifest.webmanifest`、`icon.svg` | 加入主畫面用的設定與圖示 |
-| `sync.js`、`supabase-config.js`、`supabase/schema.sql` | 雲端同步的傳輸層、設定檔與資料庫結構 |
+| `sync.js` | 同步的傳輸層（連到本機伺服器） |
+| `server/server.js` | 本機伺服器：網頁檔案、登入與同步 API，資料存在 SQLite |
+| `server/install-mac.sh`、`server/install-windows.ps1` | 開機自動啟動伺服器的安裝腳本 |
 | `tests/calc.test.js` | 計算邏輯的單元測試 |
 
 ## 計算方式
@@ -61,23 +63,42 @@ npm start   # 在 http://localhost:8000 開啟
 - 信用卡剩餘本金為 0 時，視為已繳清，不再扣除月付金額。
 - 未計入信用卡分期利息。
 
-## 雲端同步（手機與電腦共用資料）
+## 手機與電腦同步（本機伺服器）
 
-資料預設只存在這台裝置。要讓手機與電腦看到同一份資料，需要設定一次 Supabase（免費方案）：
+資料由一台常開的電腦（Mac 或 Windows）保存在 SQLite 資料庫檔案裡，手機與電腦都連到這台伺服器。
 
-1. 到 https://supabase.com 建立專案。
-2. 在專案的 **SQL Editor** 貼上 `supabase/schema.sql` 的內容並執行。
-3. 在 **Authentication → URL Configuration** 設定：
-   - Site URL：`https://leekuanhsun.github.io/claudehome/`
-   - Redirect URLs：加入同一個網址
-4. 在 **Project Settings → API** 複製 **Project URL** 與 **anon public** 金鑰，填入 `supabase-config.js`。
-5. 打開設定頁，在「雲端同步」輸入 email 寄送登入連結，點信件裡的連結即可。
+### 1. 安裝 Node.js
+到 https://nodejs.org 安裝 **22 以上**的版本（LTS 即可）。不需要另外安裝資料庫。
 
-之後在任一台裝置登入，資料就會和其他裝置同步。未登入或未設定時，應用程式仍可在本機使用。
+### 2. 安裝並啟動伺服器
+在專案資料夾中執行：
 
-- 同步的合併規則在 `calc.js` 的 `mergeDocs`：同一筆取較新的版本，刪除會同步到其他裝置。
-- 所有資料（含照片）會存在 Supabase 的同一列資料中，每位使用者只能讀寫自己的資料（由 RLS 規則保證）。
-- 免費方案的登入信件有寄送數量限制，短時間內多次登入可能會收不到信。
+- **Mac**：`bash server/install-mac.sh`
+- **Windows**（PowerShell）：`powershell -ExecutionPolicy Bypass -File server\install-windows.ps1`
+
+安裝後伺服器會在開機或登入後自動啟動，預設只聽本機 `127.0.0.1:8787`。
+
+### 3. 新增使用者
+```bash
+node server/server.js add-user 你的帳號
+```
+會提示輸入兩次密碼（輸入時不會顯示），密碼至少 8 個字。
+
+### 4. 讓手機也連得到（Tailscale）
+1. 在電腦與手機安裝 **Tailscale**（個人免費），登入同一個帳號。
+2. 到 Tailscale 管理後台開啟 **MagicDNS** 與 **HTTPS Certificates**。
+3. 在電腦上執行：`tailscale serve --bg 8787`，系統會給一個 `https://電腦名稱.xxx.ts.net` 網址。
+4. 手機與電腦都用這個網址開啟應用程式即可；也可以在設定頁的「伺服器網址」填入這個網址，讓 GitHub Pages 上的版本同步。
+
+### 5. 使用
+到設定頁的「雲端同步」登入，之後資料會和伺服器同步。未登入或伺服器連不上時，應用程式仍可在本機使用。
+
+### 注意事項
+- 電腦必須保持開機、不睡眠；合上螢幕時也要保持連線。
+- 每天會自動備份到 `server/data/backups/`，只保留最新 14 份。重要資料請另外複製一份到別處。
+- 資料庫檔案在 `server/data/`，已加入 `.gitignore`，不會上傳到 GitHub。
+- 同步的合併規則在 `calc.js` 的 `mergeDocs`，伺服器與網頁使用同一份。
+- 登入失敗 5 次會暫時鎖定 15 分鐘。
 
 ## 測試
 

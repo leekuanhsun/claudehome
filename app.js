@@ -209,15 +209,12 @@
     }
     syncRunning = true;
     try {
-      const user = await SavingPlanCloud.currentUser();
-      if (!user) {
+      if (!SavingPlanCloud.currentUser()) {
         setSyncStatus('尚未登入，資料只存在這台裝置。');
         return;
       }
       setSyncStatus('同步中…');
-      const remote = await SavingPlanCloud.fetchDoc(user);
-      applyDoc(C.mergeDocs(toDoc(), remote || C.emptyDoc()));
-      await SavingPlanCloud.pushDoc(user, toDoc());
+      applyDoc(await SavingPlanCloud.exchange(toDoc()));
       const time = new Date().toLocaleTimeString('zh-Hant', { hour: '2-digit', minute: '2-digit' });
       setSyncStatus(`已同步（${time}）`);
       onChange();
@@ -234,37 +231,50 @@
   }
 
   function initCloudPanel() {
-    const render = async () => {
-      if (!cloudReady()) {
-        $('loginForm').hidden = true;
-        $('signedIn').hidden = true;
-        setSyncStatus('尚未設定雲端同步：請編輯 supabase-config.js，填入 Supabase 的網址與金鑰。');
-        return;
-      }
-      const user = await SavingPlanCloud.currentUser();
-      $('loginForm').hidden = !!user;
+    const render = () => {
+      const user = SavingPlanCloud.currentUser();
+      $('serverUrl').value = SavingPlanCloud.serverUrl;
+      $('loginForm').hidden = !!user || !cloudReady();
       $('signedIn').hidden = !user;
       if (user) {
-        $('signedEmail').textContent = user.email;
+        $('signedUser').textContent = user.username;
         setSyncStatus('已登入，手機與電腦的資料會同步。');
+      } else if (!cloudReady()) {
+        setSyncStatus('在 GitHub Pages 上使用時，請先填入伺服器網址（例如 Mac 上的 Tailscale 網址）。');
       } else {
         setSyncStatus('登入後，手機與電腦的資料會同步。');
       }
     };
 
+    $('serverForm').addEventListener('submit', ev => {
+      ev.preventDefault();
+      try {
+        SavingPlanCloud.setServer($('serverUrl').value);
+        toast('伺服器網址已儲存');
+        render();
+      } catch (e) {
+        toast(e.message);
+      }
+    });
+
     $('loginForm').addEventListener('submit', async ev => {
       ev.preventDefault();
-      const email = $('loginEmail').value.trim();
-      if (!email) {
-        toast('請輸入 email');
+      const username = $('loginUser').value.trim();
+      const password = $('loginPass').value;
+      if (!username || !password) {
+        toast('請輸入帳號與密碼');
         return;
       }
       try {
-        await SavingPlanCloud.signIn(email);
-        toast('登入連結已寄出，請到信箱點擊');
-        setSyncStatus('登入連結已寄到信箱，點擊後會回到這裡。');
+        setSyncStatus('登入中…');
+        await SavingPlanCloud.signIn(username, password);
+        $('loginPass').value = '';
+        toast('登入成功');
+        render();
+        syncNow();
       } catch (e) {
-        toast('寄送失敗：' + e.message);
+        toast(e.message);
+        render();
       }
     });
     $('syncNowBtn').onclick = () => syncNow();
