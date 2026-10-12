@@ -39,13 +39,48 @@
     return td;
   }
 
+  // 備註欄：餐別、心得、照片縮圖、位置連結
+  function noteCell(e) {
+    const td = document.createElement('td');
+    const meals = e.meals || [];
+    const photos = e.photos || [];
+    if (!meals.length && !e.note && !photos.length && !e.location) {
+      td.textContent = '—';
+      return td;
+    }
+    if (meals.length) {
+      const tag = document.createElement('span');
+      tag.className = 'meal-tag';
+      tag.textContent = meals.join('、');
+      td.appendChild(tag);
+    }
+    if (e.note) td.appendChild(document.createTextNode(e.note));
+    for (const src of photos) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '照片';
+      img.className = 'note-thumb';
+      td.appendChild(img);
+    }
+    if (e.location) {
+      const a = document.createElement('a');
+      a.className = 'map-link';
+      a.href = `https://www.google.com/maps?q=${e.location.lat},${e.location.lng}`;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = '📍 地圖';
+      td.appendChild(a);
+    }
+    return td;
+  }
+
   // 共用的支出列表：expense 頁不顯示日期，history 頁顯示
   function fillRows(tbody, list, showDate) {
     tbody.textContent = '';
     for (const e of list) {
       const tr = document.createElement('tr');
       if (showDate) tr.append(cell(e.date));
-      tr.append(cell(e.category), cell(e.note || '—'), cell(money(e.amount), 'amount'));
+      tr.append(cell(e.category), noteCell(e), cell(money(e.amount), 'amount'));
       const op = document.createElement('td');
       const btn = document.createElement('button');
       btn.className = 'btn danger-sm';
@@ -149,8 +184,91 @@
 
   /* ---------- 記帳 ---------- */
 
+  let pendingPhotos = [];
+
+  // 照片縮成最長邊 800px 的 JPEG，控制 localStorage 的用量
+  function compressImage(file, maxSide = 800) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('無法讀取圖片'));
+      };
+      img.src = url;
+    });
+  }
+
+  // 勾選「附上目前位置」才取得位置；失敗時仍然記帳，只是不附位置
+  function getLocation() {
+    return new Promise(resolve => {
+      if (!navigator.geolocation) {
+        toast('這個瀏覽器不支援定位，已略過位置');
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => {
+          toast('無法取得位置，已略過');
+          resolve(null);
+        },
+        { timeout: 8000, maximumAge: 60000 }
+      );
+    });
+  }
+
+  function fillMeals() {
+    const box = $('mealChips');
+    for (const m of C.MEALS) {
+      const label = document.createElement('label');
+      label.className = 'check-chip';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.name = 'meal';
+      input.value = m;
+      label.append(input, document.createTextNode(m));
+      box.appendChild(label);
+    }
+  }
+
+  function checkedMeals() {
+    return [...document.querySelectorAll('input[name=meal]:checked')].map(i => i.value);
+  }
+
+  function renderPhotoPreview() {
+    const box = $('photoPreview');
+    box.textContent = '';
+    for (const src of pendingPhotos) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '待上傳的照片';
+      box.appendChild(img);
+    }
+  }
+
+  function resetExpenseForm() {
+    $('expAmount').value = '';
+    $('expNote').value = '';
+    $('expPhotos').value = '';
+    $('expLocation').checked = false;
+    document.querySelectorAll('input[name=meal]').forEach(i => { i.checked = false; });
+    pendingPhotos = [];
+    renderPhotoPreview();
+  }
+
   function initExpense() {
     fillCategories($('expCategory'));
+    fillMeals();
     $('expDate').value = todayIso();
 
     const selectedDate = () => $('expDate').value || todayIso();
@@ -175,29 +293,52 @@
       $('expAmount').focus();
     }));
 
-    $('expForm').addEventListener('submit', ev => {
+    $('expPhotos').addEventListener('change', async ev => {
+      const files = [...ev.target.files];
+      if (files.length > C.MAX_PHOTOS) toast(`最多 ${C.MAX_PHOTOS} 張，已取前 ${C.MAX_PHOTOS} 張`);
+      pendingPhotos = [];
+      for (const file of files.slice(0, C.MAX_PHOTOS)) {
+        try {
+          pendingPhotos.push(await compressImage(file));
+        } catch {
+          toast('有一張圖片無法讀取，已略過');
+        }
+      }
+      renderPhotoPreview();
+    });
+
+    $('expForm').addEventListener('submit', async ev => {
       ev.preventDefault();
-      const res = C.buildExpense({
-        date: $('expDate').value,
-        amount: $('expAmount').value,
-        category: $('expCategory').value,
-        note: $('expNote').value,
-      }, newId());
-      if (!res.ok) {
-        toast(res.message);
-        $(res.field === 'date' ? 'expDate' : 'expAmount').focus();
-        return;
+      const submitBtn = $('expForm').querySelector('button[type=submit]');
+      submitBtn.disabled = true;
+      try {
+        const location = $('expLocation').checked ? await getLocation() : null;
+        const res = C.buildExpense({
+          date: $('expDate').value,
+          amount: $('expAmount').value,
+          category: $('expCategory').value,
+          note: $('expNote').value,
+          meals: checkedMeals(),
+          photos: pendingPhotos,
+          location,
+        }, newId());
+        if (!res.ok) {
+          toast(res.message);
+          $(res.field === 'date' ? 'expDate' : 'expAmount').focus();
+          return;
+        }
+        expenses.push(res.expense);
+        if (!save()) {
+          expenses.pop();
+          return;
+        }
+        resetExpenseForm();
+        render();
+        toast(`已記錄 ${money(res.expense.amount)}`);
+        $('expAmount').focus();
+      } finally {
+        submitBtn.disabled = false;
       }
-      expenses.push(res.expense);
-      if (!save()) {
-        expenses.pop();
-        return;
-      }
-      $('expAmount').value = '';
-      $('expNote').value = '';
-      render();
-      toast(`已記錄 ${money(res.expense.amount)}`);
-      $('expAmount').focus();
     });
 
     onChange = render;

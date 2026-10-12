@@ -87,7 +87,7 @@ test('buildExpense：金額四捨五入到分、備註去頭尾空白並截斷',
     date: '2026-10-11',
     amount: '185.567',
     category: '餐飲',
-    note: `  ${'x'.repeat(100)}  `,
+    note: `  ${'x'.repeat(600)}  `,
   }, 1);
   assert.equal(r.ok, true);
   assert.equal(r.expense.amount, 185.57);
@@ -153,7 +153,68 @@ test('toCsv：加上 BOM、跳脫引號、防止試算表公式注入', () => {
   ]);
   assert.equal(csv.charCodeAt(0), 0xfeff);
   assert.ok(csv.includes('"\'=HYPERLINK(""x"")"'));
-  assert.ok(csv.startsWith('﻿"日期","類別","備註","金額"'));
+  assert.ok(csv.startsWith('﻿"日期","類別","餐別","備註","金額"'));
+});
+
+const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+
+test('buildExpense：餐別只保留固定選項，順序依 MEALS', () => {
+  const r = C.buildExpense({
+    date: '2026-10-12', amount: '120', category: '餐飲',
+    meals: ['晚餐', '亂填', '早餐'],
+  }, 1);
+  assert.deepEqual(r.expense.meals, ['早餐', '晚餐']);
+});
+
+test('buildExpense：照片只接受圖片 data URL，最多 3 張', () => {
+  const r = C.buildExpense({
+    date: '2026-10-12', amount: '120', category: '餐飲',
+    photos: [PNG, 'javascript:alert(1)', PNG, PNG, PNG],
+  }, 1);
+  assert.equal(r.expense.photos.length, C.MAX_PHOTOS);
+  assert.ok(r.expense.photos.every(p => p.startsWith('data:image/')));
+});
+
+test('buildExpense：超過大小上限的照片會被丟掉', () => {
+  const big = 'data:image/jpeg;base64,' + 'A'.repeat(C.MAX_PHOTO_CHARS);
+  const r = C.buildExpense({ date: '2026-10-12', amount: '120', category: '餐飲', photos: [big] }, 1);
+  assert.deepEqual(r.expense.photos, []);
+});
+
+test('buildExpense：位置需為有效經緯度，並取到約 1 公尺精度', () => {
+  const ok = C.buildExpense({
+    date: '2026-10-12', amount: '120', category: '餐飲',
+    location: { lat: 25.0330123456, lng: 121.5654987654 },
+  }, 1);
+  assert.deepEqual(ok.expense.location, { lat: 25.03301, lng: 121.56550 });
+
+  const bad = C.buildExpense({
+    date: '2026-10-12', amount: '120', category: '餐飲',
+    location: { lat: 95, lng: 121 },
+  }, 1);
+  assert.equal(bad.expense.location, null);
+});
+
+test('buildExpense：沒有填的選填欄位有預設值', () => {
+  const r = C.buildExpense({ date: '2026-10-12', amount: '120', category: '餐飲' }, 1);
+  assert.deepEqual(r.expense.meals, []);
+  assert.deepEqual(r.expense.photos, []);
+  assert.equal(r.expense.location, null);
+  assert.equal(r.expense.note, '');
+});
+
+test('buildExpense：心得最多 500 字', () => {
+  const r = C.buildExpense({ date: '2026-10-12', amount: '120', category: '餐飲', note: 'x'.repeat(600) }, 1);
+  assert.equal(r.expense.note.length, 500);
+});
+
+test('toCsv：餐別以頓號串接，舊資料沒有餐別也不會出錯', () => {
+  const csv = C.toCsv([
+    { id: 1, date: '2026-10-01', amount: 10, category: '餐飲', meals: ['早餐', '下午茶'], note: '' },
+    { id: 2, date: '2026-10-02', amount: 20, category: '交通', note: 'old' },
+  ]);
+  assert.ok(csv.includes('"早餐、下午茶"'));
+  assert.ok(csv.includes('"2026-10-02","交通","","old","20"'));
 });
 
 function pick(r) {
