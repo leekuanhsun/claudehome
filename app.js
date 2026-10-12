@@ -343,21 +343,6 @@
 
   let pendingDiaryPhotos = [];
 
-  // 「記帳｜日記」切換
-  function initSegments() {
-    const views = { expense: $('expenseView'), diary: $('diaryView') };
-    const tabs = { expense: $('segExpense'), diary: $('segDiary') };
-    const show = name => {
-      for (const k of Object.keys(views)) {
-        views[k].hidden = k !== name;
-        tabs[k].setAttribute('aria-selected', String(k === name));
-      }
-    };
-    tabs.expense.onclick = () => show('expense');
-    tabs.diary.onclick = () => show('diary');
-    show('expense');
-  }
-
   // 縮圖列：填入既有的容器
   function renderThumbs(box, srcs, alt) {
     box.textContent = '';
@@ -539,8 +524,6 @@
         addCustomTag();
       }
     });
-    initSegments();
-    initDiary();
     $('expDate').value = todayIso();
 
     const selectedDate = () => $('expDate').value || todayIso();
@@ -775,6 +758,7 @@
   const INITS = {
     overview: initOverview,
     expense: initExpense,
+    diary: initDiary,
     history: initHistory,
     plan: initPlan,
     settings: initSettings,

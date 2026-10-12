@@ -1,9 +1,10 @@
 /* 離線快取：讓存錢計畫在沒有網路時也能開啟 */
-const CACHE = 'saving-plan-v6';
+const CACHE = 'saving-plan-v7';
 const SHELL = [
   './',
   'index.html',
   'expense.html',
+  'diary.html',
   'history.html',
   'plan.html',
   'settings.html',
