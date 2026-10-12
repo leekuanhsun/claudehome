@@ -58,9 +58,15 @@
     const td = document.createElement('td');
     const meals = e.meals || [];
     const photos = e.photos || [];
-    if (!meals.length && !e.note && !photos.length && !e.location) {
+    if (!meals.length && !e.note && !photos.length && !e.location && !e.pay) {
       td.textContent = '—';
       return td;
+    }
+    if (e.pay) {
+      const pay = document.createElement('span');
+      pay.className = 'pay-tag';
+      pay.textContent = e.pay;
+      td.appendChild(pay);
     }
     if (meals.length) {
       const tag = document.createElement('span');
@@ -652,6 +658,11 @@
 
   function initExpense() {
     fillCategories($('expCategory'));
+    for (const p of C.PAY_METHODS) {
+      const o = document.createElement('option');
+      o.textContent = p;
+      $('expPay').appendChild(o);
+    }
     renderTags(false);
     $('expCategory').addEventListener('change', () => renderTags(false));
     $('tagAdd').onclick = addCustomTag;
@@ -709,6 +720,7 @@
           date: $('expDate').value,
           amount: $('expAmount').value,
           category: $('expCategory').value,
+          pay: $('expPay').value,
           note: $('expNote').value,
           meals: checkedMeals(),
           photos: pendingPhotos,
@@ -764,6 +776,7 @@
       setBar($('outingBar'), C.percentOf(m.outing, settings.outing));
 
       renderCategories(m.categories);
+      renderCategories(m.pays, 'payBreakdown');
 
       const list = m.list.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
       fillRows($('histRows'), list, true);
@@ -795,8 +808,8 @@
     render();
   }
 
-  function renderCategories(categories) {
-    const box = $('catBreakdown');
+  function renderCategories(categories, boxId = 'catBreakdown') {
+    const box = $(boxId);
     box.textContent = '';
     if (!categories.length) {
       const d = document.createElement('div');
