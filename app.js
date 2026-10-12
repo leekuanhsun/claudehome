@@ -8,6 +8,7 @@
     settings: 'savingPlan.v2.settings',
     expenses: 'savingPlan.v2.expenses',
     diary: 'savingPlan.v2.diary',
+    tags: 'savingPlan.v2.tags',
   };
   const LEGACY = { settings: 'savingPlanSettings', expenses: 'savingPlanExpenses' };
   const page = document.body.dataset.page;
@@ -15,6 +16,7 @@
   let settings = { ...C.DEFAULTS };
   let expenses = [];
   let diary = [];
+  let customTags = {};
   let onChange = () => {};
   let onDiaryChange = () => {};
 
@@ -118,6 +120,7 @@
     settings = C.sanitizeSettings(readJSON([KEYS.settings, LEGACY.settings], {}));
     const stored = readJSON([KEYS.expenses, LEGACY.expenses], []);
     expenses = Array.isArray(stored) ? stored.filter(C.isValidExpense) : [];
+    customTags = C.sanitizeCustomTags(readJSON([KEYS.tags], {}));
     const storedDiary = readJSON([KEYS.diary], []);
     diary = Array.isArray(storedDiary) ? storedDiary.filter(C.isValidDiary) : [];
   }
@@ -127,6 +130,7 @@
       localStorage.setItem(KEYS.settings, JSON.stringify(settings));
       localStorage.setItem(KEYS.expenses, JSON.stringify(expenses));
       localStorage.setItem(KEYS.diary, JSON.stringify(diary));
+      localStorage.setItem(KEYS.tags, JSON.stringify(customTags));
       return true;
     } catch {
       toast('無法儲存資料，請確認瀏覽器儲存空間或是否在無痕模式');
@@ -236,18 +240,78 @@
     });
   }
 
-  function fillMeals() {
+  // 依目前選的類別顯示細項；keep 為 true 時保留已勾選的項目
+  function renderTags(keep) {
+    const category = $('expCategory').value;
+    const previous = keep ? checkedMeals() : [];
+    const presets = C.PRESET_TAGS[category] || [];
+    const tags = C.tagsFor(category, customTags);
+    $('tagLegend').textContent = category === '餐飲' ? '餐別（可複選）' : `${category}細項（可複選）`;
+
     const box = $('mealChips');
-    for (const m of C.MEALS) {
+    box.textContent = '';
+    for (const t of tags) {
+      const wrap = document.createElement('span');
+      wrap.className = 'tag-wrap';
       const label = document.createElement('label');
       label.className = 'check-chip';
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.name = 'meal';
-      input.value = m;
-      label.append(input, document.createTextNode(m));
-      box.appendChild(label);
+      input.value = t;
+      input.checked = previous.includes(t);
+      label.append(input, document.createTextNode(t));
+      wrap.appendChild(label);
+      if (!presets.includes(t)) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'tag-del';
+        del.textContent = '×';
+        del.setAttribute('aria-label', `移除 ${t}`);
+        del.onclick = () => removeCustomTag(category, t);
+        wrap.appendChild(del);
+      }
+      box.appendChild(wrap);
     }
+    if (!tags.length) {
+      const hint = document.createElement('span');
+      hint.className = 'muted';
+      hint.textContent = '還沒有細項，可以在下方自己新增';
+      box.appendChild(hint);
+    }
+  }
+
+  function addCustomTag() {
+    const category = $('expCategory').value;
+    const res = C.addCustomTag(customTags, category, $('tagInput').value);
+    if (!res.ok) {
+      toast(res.message);
+      return;
+    }
+    const prev = customTags;
+    customTags = res.customTags;
+    if (!save()) {
+      customTags = prev;
+      return;
+    }
+    $('tagInput').value = '';
+    renderTags(true);
+    document.querySelectorAll('input[name=meal]').forEach(i => {
+      if (i.value === res.name) i.checked = true;
+    });
+    toast(`已新增「${res.name}」`);
+  }
+
+  function removeCustomTag(category, name) {
+    if (!confirm(`移除「${name}」？已記錄的支出不會受影響。`)) return;
+    const prev = customTags;
+    customTags = C.removeCustomTag(customTags, category, name);
+    if (!save()) {
+      customTags = prev;
+      return;
+    }
+    renderTags(true);
+    toast('已移除');
   }
 
   function checkedMeals() {
@@ -466,7 +530,15 @@
 
   function initExpense() {
     fillCategories($('expCategory'));
-    fillMeals();
+    renderTags(false);
+    $('expCategory').addEventListener('change', () => renderTags(false));
+    $('tagAdd').onclick = addCustomTag;
+    $('tagInput').addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        addCustomTag();
+      }
+    });
     initSegments();
     initDiary();
     $('expDate').value = todayIso();

@@ -153,17 +153,61 @@ test('toCsv：加上 BOM、跳脫引號、防止試算表公式注入', () => {
   ]);
   assert.equal(csv.charCodeAt(0), 0xfeff);
   assert.ok(csv.includes('"\'=HYPERLINK(""x"")"'));
-  assert.ok(csv.startsWith('﻿"日期","類別","餐別","備註","金額"'));
+  assert.ok(csv.startsWith('﻿"日期","類別","餐別／細項","備註","金額"'));
 });
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 
-test('buildExpense：餐別只保留固定選項，順序依 MEALS', () => {
+test('buildExpense：細項去掉空白與重複，過長的名稱會被丟掉', () => {
   const r = C.buildExpense({
-    date: '2026-10-12', amount: '120', category: '餐飲',
-    meals: ['晚餐', '亂填', '早餐'],
+    date: '2026-10-12', amount: '120', category: '交通',
+    meals: [' 加油 ', '加油', '這個名稱實在太長了不行', '車票'],
   }, 1);
-  assert.deepEqual(r.expense.meals, ['早餐', '晚餐']);
+  assert.deepEqual(r.expense.meals, ['加油', '車票']);
+});
+
+test('tagsFor：預設細項在前，自訂細項接在後，不重複', () => {
+  const custom = { 交通: ['洗車', '加油'] };
+  assert.deepEqual(C.tagsFor('交通', custom), ['保養', '加油', '車票', '洗車']);
+  assert.deepEqual(C.tagsFor('餐飲', custom), C.PRESET_TAGS['餐飲']);
+  assert.deepEqual(C.tagsFor('購物', custom), []);
+});
+
+test('addCustomTag：新增成功，並寫入對應類別', () => {
+  const r = C.addCustomTag({}, '交通', ' 洗車 ');
+  assert.equal(r.ok, true);
+  assert.equal(r.name, '洗車');
+  assert.deepEqual(r.customTags, { 交通: ['洗車'] });
+});
+
+test('addCustomTag：空白、太長、重複、超過數量都會被擋下', () => {
+  assert.equal(C.addCustomTag({}, '交通', '   ').ok, false);
+  assert.equal(C.addCustomTag({}, '交通', 'x'.repeat(C.MAX_TAG_LEN + 1)).ok, false);
+  assert.equal(C.addCustomTag({}, '交通', '加油').ok, false, '預設細項不能重複新增');
+  const full = { 交通: Array.from({ length: 20 }, (_, i) => `項${i}`) };
+  assert.equal(C.addCustomTag(full, '交通', '新的').ok, false);
+});
+
+test('addCustomTag：同名細項在不同類別可以各自存在', () => {
+  const r = C.addCustomTag({ 購物: ['保養'] }, '交通', '保養');
+  assert.equal(r.ok, false, '交通已有預設的保養，應該擋下');
+  const other = C.addCustomTag({}, '購物', '保養');
+  assert.equal(other.ok, true);
+});
+
+test('removeCustomTag：只移除指定類別的細項', () => {
+  const r = C.removeCustomTag({ 交通: ['洗車', '停車'], 購物: ['洗車'] }, '交通', '洗車');
+  assert.deepEqual(r, { 交通: ['停車'], 購物: ['洗車'] });
+});
+
+test('sanitizeCustomTags：忽略未知類別與不合法的資料', () => {
+  const s = C.sanitizeCustomTags({
+    交通: ['洗車', '洗車', '  ', 'x'.repeat(50)],
+    不存在的類別: ['abc'],
+    餐飲: 'not-an-array',
+  });
+  assert.deepEqual(s, { 交通: ['洗車'] });
+  assert.deepEqual(C.sanitizeCustomTags(null), {});
 });
 
 test('buildExpense：照片只接受圖片 data URL，最多 3 張', () => {
