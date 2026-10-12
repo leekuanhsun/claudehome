@@ -158,6 +158,16 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 }
 .check-chip input{width:auto;min-height:auto;margin:0;accent-color:var(--purple)}
 .check-chip:has(input:checked){background:var(--purple);color:#fff}
+.tag-wrap{display:inline-flex;align-items:center;gap:4px}
+.tag-del{
+  width:28px;min-height:28px;height:28px;padding:0;border-radius:50%;
+  background:#fff;color:var(--muted);border:1px solid var(--line);
+  font-size:15px;line-height:1;
+}
+.tag-del:hover{color:var(--red);border-color:var(--red)}
+.tag-add{display:flex;gap:8px;margin-top:10px}
+.tag-add input{flex:1;min-width:0}
+.tag-add .btn{min-height:44px;flex:none}
 .check-row{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:15px;cursor:pointer}
 .check-row input{width:auto;min-height:auto;margin:0;accent-color:var(--purple)}
 .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}

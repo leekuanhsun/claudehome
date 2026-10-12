@@ -37,7 +37,14 @@
   };
 
   const CATEGORIES = ['餐飲', '交通', '飲料／點心', '購物', '朋友聚會', '生活用品', '其他'];
-  const MEALS = ['早餐', '午餐', '晚餐', '下午茶'];
+  // 各類別預設的細項（餐飲的細項就是餐別）
+  const PRESET_TAGS = {
+    餐飲: ['早餐', '午餐', '晚餐', '下午茶'],
+    交通: ['保養', '加油', '車票'],
+  };
+  const MAX_TAG_LEN = 10;
+  const MAX_CUSTOM_PER_CATEGORY = 20;
+  const MAX_TAGS_PER_EXPENSE = 10;
   const OUTING = '朋友聚會';
   const MAX_AMOUNT = 1e8;
   const MAX_NOTE = 500;
@@ -150,6 +157,49 @@
     return typeof src === 'string' && src.startsWith('data:image/') && src.length <= MAX_PHOTO_CHARS;
   }
 
+  // 去掉空白與重複，過長的名稱會被丟掉
+  function uniqueTags(list) {
+    const names = (list || []).map(t => String(t).trim()).filter(t => t && t.length <= MAX_TAG_LEN);
+    return [...new Set(names)].slice(0, MAX_TAGS_PER_EXPENSE);
+  }
+
+  // 某類別目前可選的細項：預設的在前，自訂的接在後面
+  function tagsFor(category, customTags) {
+    const presets = PRESET_TAGS[category] || [];
+    const customs = (customTags && customTags[category]) || [];
+    return [...presets, ...customs.filter(t => !presets.includes(t))];
+  }
+
+  function addCustomTag(customTags, category, raw) {
+    const name = String(raw || '').trim();
+    if (!name) return { ok: false, message: '請輸入細項名稱' };
+    if (name.length > MAX_TAG_LEN) return { ok: false, message: `名稱最多 ${MAX_TAG_LEN} 個字` };
+    if (tagsFor(category, customTags).includes(name)) return { ok: false, message: '這個細項已經有了' };
+    const customs = (customTags && customTags[category]) || [];
+    if (customs.length >= MAX_CUSTOM_PER_CATEGORY) {
+      return { ok: false, message: `每個類別最多新增 ${MAX_CUSTOM_PER_CATEGORY} 個細項` };
+    }
+    return { ok: true, name, customTags: { ...customTags, [category]: [...customs, name] } };
+  }
+
+  function removeCustomTag(customTags, category, name) {
+    const customs = (customTags && customTags[category]) || [];
+    return { ...customTags, [category]: customs.filter(t => t !== name) };
+  }
+
+  // 讀取 localStorage 的自訂細項：只保留已知類別與合法名稱
+  function sanitizeCustomTags(stored) {
+    const out = {};
+    if (!stored || typeof stored !== 'object') return out;
+    for (const cat of Object.keys(stored)) {
+      if (!CATEGORIES.includes(cat) || !Array.isArray(stored[cat])) continue;
+      const names = [...new Set(stored[cat].map(t => String(t).trim()).filter(t => t && t.length <= MAX_TAG_LEN))]
+        .slice(0, MAX_CUSTOM_PER_CATEGORY);
+      if (names.length) out[cat] = names;
+    }
+    return out;
+  }
+
   function buildExpense(input, id) {
     const date = String(input.date || '');
     if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
@@ -161,7 +211,7 @@
 
     const category = CATEGORIES.includes(input.category) ? input.category : '其他';
     const note = String(input.note || '').trim().slice(0, MAX_NOTE);
-    const meals = MEALS.filter(m => (input.meals || []).includes(m));
+    const meals = uniqueTags(input.meals);
     const photos = (input.photos || []).filter(validPhoto).slice(0, MAX_PHOTOS);
     const location = validLocation(input.location);
     return { ok: true, expense: { id, date, amount, category, note, meals, photos, location } };
@@ -198,7 +248,7 @@
 
   function toCsv(list) {
     const rows = [
-      ['日期', '類別', '餐別', '備註', '金額'],
+      ['日期', '類別', '餐別／細項', '備註', '金額'],
       ...list.map(e => [e.date, e.category, (e.meals || []).join('、'), e.note, e.amount]),
     ];
     return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
@@ -243,7 +293,12 @@
     LIMITS,
     LABELS,
     CATEGORIES,
-    MEALS,
+    PRESET_TAGS,
+    MAX_TAG_LEN,
+    tagsFor,
+    addCustomTag,
+    removeCustomTag,
+    sanitizeCustomTags,
     OUTING,
     MAX_AMOUNT,
     MAX_NOTE,

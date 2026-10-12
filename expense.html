@@ -45,8 +45,12 @@
       </div>
 
       <fieldset class="meal-field">
-        <legend class="label-s">餐別（可複選）</legend>
+        <legend class="label-s" id="tagLegend">餐別（可複選）</legend>
         <div class="check-chips" id="mealChips"></div>
+        <div class="tag-add">
+          <input id="tagInput" type="text" maxlength="10" placeholder="自訂細項，例如：洗車">
+          <button class="btn ghost" id="tagAdd" type="button">新增</button>
+        </div>
       </fieldset>
 
       <div class="quick">
