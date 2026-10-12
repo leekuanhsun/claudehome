@@ -43,6 +43,21 @@
     交通: ['保養', '加油', '車票'],
   };
   const PAY_METHODS = ['現金', '國泰刷卡', '中信刷卡', '富邦刷卡'];
+  // 所有金額都換算成台幣（amount）儲存；TWD 是基準幣別
+  const CURRENCY_LABELS = {
+    TWD: '台幣 TWD',
+    USD: '美元 USD',
+    JPY: '日圓 JPY',
+    EUR: '歐元 EUR',
+    CNY: '人民幣 CNY',
+    HKD: '港幣 HKD',
+    KRW: '韓元 KRW',
+    GBP: '英鎊 GBP',
+    THB: '泰銖 THB',
+    SGD: '新加坡幣 SGD',
+  };
+  const CURRENCIES = Object.keys(CURRENCY_LABELS);
+  const FX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
   const MAX_TAG_LEN = 10;
   const MAX_CUSTOM_PER_CATEGORY = 20;
   const MAX_TAGS_PER_EXPENSE = 10;
@@ -205,9 +220,23 @@
     const date = String(input.date || '');
     if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
 
-    const amount = Math.round(Number(input.amount) * 100) / 100;
-    if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) {
+    const currency = CURRENCIES.includes(input.currency) ? input.currency : 'TWD';
+    const origAmount = Math.round(Number(input.amount) * 100) / 100;
+    if (!Number.isFinite(origAmount) || origAmount <= 0 || origAmount > MAX_AMOUNT) {
       return { ok: false, field: 'amount', message: '請輸入大於 0 的金額' };
+    }
+    // rate 是「1 單位外幣等於多少台幣」；台幣的匯率固定為 1
+    let rate = 1;
+    let amount = origAmount;
+    if (currency !== 'TWD') {
+      rate = Number(input.rate);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        return { ok: false, field: 'currency', message: '還沒有取得匯率，請稍後再試，或改用台幣' };
+      }
+      amount = Math.round(origAmount * rate);
+      if (amount <= 0 || amount > MAX_AMOUNT) {
+        return { ok: false, field: 'amount', message: '換算後的金額不正確，請檢查金額' };
+      }
     }
 
     const category = CATEGORIES.includes(input.category) ? input.category : '其他';
@@ -216,7 +245,13 @@
     const photos = (input.photos || []).filter(validPhoto).slice(0, MAX_PHOTOS);
     const location = validLocation(input.location);
     const pay = PAY_METHODS.includes(input.pay) ? input.pay : '現金';
-    return { ok: true, expense: { id, date, amount, category, pay, note, meals, photos, location } };
+    return {
+      ok: true,
+      expense: {
+        id, date, amount, category, pay, note, meals, photos, location,
+        currency, origAmount, rate,
+      },
+    };
   }
 
   function monthSummary(expenses, month) {
@@ -256,8 +291,11 @@
 
   function toCsv(list) {
     const rows = [
-      ['日期', '類別', '餐別／細項', '付款方式', '備註', '金額'],
-      ...list.map(e => [e.date, e.category, (e.meals || []).join('、'), e.pay || '', e.note, e.amount]),
+      ['日期', '類別', '餐別／細項', '付款方式', '備註', '金額（台幣）', '幣別', '原幣金額'],
+      ...list.map(e => [
+        e.date, e.category, (e.meals || []).join('、'), e.pay || '', e.note, e.amount,
+        e.currency || '', e.currency && e.currency !== 'TWD' ? e.origAmount : '',
+      ]),
     ];
     return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
   }
@@ -338,8 +376,28 @@
     return merged;
   }
 
+  // open.er-api.com 的回應：rates 是「1 台幣能換多少外幣」，這裡轉成「1 外幣值多少台幣」
+  function parseFx(json, now = Date.now()) {
+    if (!json || json.result !== 'success' || !json.rates || typeof json.rates !== 'object') return null;
+    const twdPer = { TWD: 1 };
+    for (const c of CURRENCIES) {
+      if (c === 'TWD') continue;
+      const r = Number(json.rates[c]);
+      if (Number.isFinite(r) && r > 0) twdPer[c] = Math.round((1 / r) * 10000) / 10000;
+    }
+    return { fetchedAt: now, updated: json.time_last_update_utc || '', twdPer };
+  }
+
+  function fxIsStale(fx, now = Date.now()) {
+    return !fx || !fx.fetchedAt || now - fx.fetchedAt > FX_MAX_AGE_MS;
+  }
+
   return {
     DEFAULTS,
+    CURRENCIES,
+    CURRENCY_LABELS,
+    parseFx,
+    fxIsStale,
     mergeDocs,
     emptyDoc,
     MOODS,
