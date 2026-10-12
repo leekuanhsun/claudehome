@@ -37,9 +37,13 @@
   };
 
   const CATEGORIES = ['餐飲', '交通', '飲料／點心', '購物', '朋友聚會', '生活用品', '其他'];
+  const MEALS = ['早餐', '午餐', '晚餐', '下午茶'];
   const OUTING = '朋友聚會';
   const MAX_AMOUNT = 1e8;
-  const MAX_NOTE = 80;
+  const MAX_NOTE = 500;
+  const MAX_PHOTOS = 3;
+  // 照片以 data URL 存在 localStorage，單張上限約 500KB（base64 字元數）
+  const MAX_PHOTO_CHARS = 700000;
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   const pad = n => String(n).padStart(2, '0');
@@ -132,6 +136,20 @@
       && typeof e.category === 'string';
   }
 
+  // 只接受 1 到 90 / -180 到 180 的座標，四捨五入到約 1 公尺的精度
+  function validLocation(loc) {
+    if (!loc) return null;
+    const lat = Number(loc.lat);
+    const lng = Number(loc.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
+  }
+
+  function validPhoto(src) {
+    return typeof src === 'string' && src.startsWith('data:image/') && src.length <= MAX_PHOTO_CHARS;
+  }
+
   function buildExpense(input, id) {
     const date = String(input.date || '');
     if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
@@ -143,7 +161,10 @@
 
     const category = CATEGORIES.includes(input.category) ? input.category : '其他';
     const note = String(input.note || '').trim().slice(0, MAX_NOTE);
-    return { ok: true, expense: { id, date, amount, category, note } };
+    const meals = MEALS.filter(m => (input.meals || []).includes(m));
+    const photos = (input.photos || []).filter(validPhoto).slice(0, MAX_PHOTOS);
+    const location = validLocation(input.location);
+    return { ok: true, expense: { id, date, amount, category, note, meals, photos, location } };
   }
 
   function monthSummary(expenses, month) {
@@ -176,7 +197,10 @@
   }
 
   function toCsv(list) {
-    const rows = [['日期', '類別', '備註', '金額'], ...list.map(e => [e.date, e.category, e.note, e.amount])];
+    const rows = [
+      ['日期', '類別', '餐別', '備註', '金額'],
+      ...list.map(e => [e.date, e.category, (e.meals || []).join('、'), e.note, e.amount]),
+    ];
     return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
   }
 
@@ -185,9 +209,12 @@
     LIMITS,
     LABELS,
     CATEGORIES,
+    MEALS,
     OUTING,
     MAX_AMOUNT,
     MAX_NOTE,
+    MAX_PHOTOS,
+    MAX_PHOTO_CHARS,
     toIsoDate,
     monthOf,
     addMonths,

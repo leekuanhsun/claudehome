@@ -58,6 +58,8 @@ p{margin:0}
 .page-head p{margin-top:6px;color:var(--muted)}
 .page-head.row{align-items:flex-end}
 .grid{display:grid;gap:16px}
+/* 格線子元素預設不會縮小，表格會把整頁撐寬，所以要允許縮小 */
+.page>*,.grid>*{min-width:0}
 .g2{grid-template-columns:1fr 1fr}
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -143,6 +145,28 @@ th,td{padding:12px 10px;text-align:left;border-bottom:1px solid #eeeaf8;white-sp
 th{color:#6b638f;font-weight:700;background:#faf9ff}
 td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .empty{text-align:center;padding:28px;color:var(--muted)}
+
+/* ---------- 餐別、照片與位置 ---------- */
+.meal-field{border:0;margin:16px 0 0;padding:0;display:grid;gap:8px}
+#expForm>.field{margin-top:16px}
+.meal-field legend{padding:0;margin-bottom:6px}
+.check-chips{display:flex;gap:8px;flex-wrap:wrap}
+.check-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  min-height:36px;padding:6px 14px;border-radius:999px;
+  background:var(--purple-soft);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer;
+}
+.check-chip input{width:auto;min-height:auto;margin:0;accent-color:var(--purple)}
+.check-chip:has(input:checked){background:var(--purple);color:#fff}
+.check-row{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:15px;cursor:pointer}
+.check-row input{width:auto;min-height:auto;margin:0;accent-color:var(--purple)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.thumbs:empty{display:none}
+.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.note-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;border:1px solid var(--line);vertical-align:middle;margin:2px 4px 2px 0}
+.meal-tag{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:999px;background:var(--purple-soft);color:var(--ink);font-size:12px;font-weight:600}
+.map-link{color:var(--purple);font-size:13px;font-weight:600;text-decoration:none;margin-left:4px}
+.map-link:hover{text-decoration:underline}
 
 /* ---------- 提示訊息 ---------- */
 .toast{
