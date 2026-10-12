@@ -282,8 +282,58 @@
     return !!e && typeof e.id === 'number' && DATE_RE.test(e.date) && typeof e.text === 'string';
   }
 
+  /* ---------- 雲端同步合併 ---------- */
+
+  // 文件結構：{ expenses, diary, tombstones: {expenses:{id:時間}, diary:{id:時間}},
+  //            settings: {u, v}, tags: {u, v} }；u 是最後修改的毫秒時間戳
+  const SYNC_LISTS = ['expenses', 'diary'];
+
+  function newerOf(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    return (b.u || 0) > (a.u || 0) ? b : a;
+  }
+
+  function emptyDoc() {
+    return {
+      expenses: [],
+      diary: [],
+      tombstones: { expenses: {}, diary: {} },
+      settings: { u: 0, v: { ...DEFAULTS } },
+      tags: { u: 0, v: {} },
+    };
+  }
+
+  // 兩份文件合併：同一筆取較新的；刪除時間晚於修改時間的就移除；設定與細項取較新的一份
+  function mergeDocs(local, remote) {
+    const a = { ...emptyDoc(), ...local };
+    const b = { ...emptyDoc(), ...remote };
+    const tombstones = { expenses: {}, diary: {} };
+    for (const k of SYNC_LISTS) {
+      const t = { ...(b.tombstones?.[k] || {}) };
+      for (const [id, ts] of Object.entries(a.tombstones?.[k] || {})) {
+        t[id] = Math.max(t[id] || 0, ts);
+      }
+      tombstones[k] = t;
+    }
+
+    const merged = { tombstones };
+    for (const k of SYNC_LISTS) {
+      const byId = new Map();
+      for (const item of [...(a[k] || []), ...(b[k] || [])]) {
+        byId.set(item.id, newerOf(byId.get(item.id), item));
+      }
+      merged[k] = [...byId.values()].filter(item => !(tombstones[k][item.id] >= (item.u || 0)));
+    }
+    merged.settings = newerOf(a.settings, b.settings);
+    merged.tags = newerOf(a.tags, b.tags);
+    return merged;
+  }
+
   return {
     DEFAULTS,
+    mergeDocs,
+    emptyDoc,
     MOODS,
     MAX_DIARY_PHOTOS,
     MAX_DIARY_TEXT,

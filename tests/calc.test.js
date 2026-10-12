@@ -304,3 +304,56 @@ test('monthDiary：只取指定月份，且最新的在前', () => {
 function pick(r) {
   return r.ok ? [] : [r.field];
 }
+
+/* ---------- 雲端同步合併 ---------- */
+
+test('mergeDocs：兩邊各自新增的資料會合併在一起', () => {
+  const local = { ...C.emptyDoc(), expenses: [{ id: 1, u: 10, amount: 100 }] };
+  const remote = { ...C.emptyDoc(), expenses: [{ id: 2, u: 20, amount: 200 }] };
+  const m = C.mergeDocs(local, remote);
+  assert.deepEqual(m.expenses.map(e => e.id).sort(), [1, 2]);
+});
+
+test('mergeDocs：同一筆資料取修改時間較新的版本', () => {
+  const local = { ...C.emptyDoc(), expenses: [{ id: 1, u: 10, amount: 100 }] };
+  const remote = { ...C.emptyDoc(), expenses: [{ id: 1, u: 30, amount: 150 }] };
+  const m = C.mergeDocs(local, remote);
+  assert.equal(m.expenses.length, 1);
+  assert.equal(m.expenses[0].amount, 150);
+  assert.equal(C.mergeDocs(remote, local).expenses[0].amount, 150, '順序不影響結果');
+});
+
+test('mergeDocs：一邊刪除的資料會從合併結果移除', () => {
+  const local = { ...C.emptyDoc(), expenses: [], tombstones: { expenses: { 1: 50 }, diary: {} } };
+  const remote = { ...C.emptyDoc(), expenses: [{ id: 1, u: 10, amount: 100 }] };
+  const m = C.mergeDocs(local, remote);
+  assert.deepEqual(m.expenses, []);
+  assert.equal(m.tombstones.expenses[1], 50, '刪除記錄會保留，讓之後的同步也能刪掉');
+});
+
+test('mergeDocs：刪除之後又重新編輯的資料會保留', () => {
+  const local = { ...C.emptyDoc(), expenses: [], tombstones: { expenses: { 1: 50 }, diary: {} } };
+  const remote = { ...C.emptyDoc(), expenses: [{ id: 1, u: 80, amount: 100 }] };
+  assert.equal(C.mergeDocs(local, remote).expenses.length, 1);
+});
+
+test('mergeDocs：設定與細項取較新的一份', () => {
+  const local = { ...C.emptyDoc(), settings: { u: 5, v: { ...C.DEFAULTS, income: 1 } } };
+  const remote = { ...C.emptyDoc(), settings: { u: 9, v: { ...C.DEFAULTS, income: 2 } }, tags: { u: 3, v: { 交通: ['洗車'] } } };
+  const m = C.mergeDocs(local, remote);
+  assert.equal(m.settings.v.income, 2);
+  assert.deepEqual(m.tags.v, { 交通: ['洗車'] });
+});
+
+test('mergeDocs：日記也會合併與刪除', () => {
+  const local = { ...C.emptyDoc(), diary: [{ id: 7, u: 40, text: 'a' }] };
+  const remote = { ...C.emptyDoc(), diary: [{ id: 8, u: 41, text: 'b' }], tombstones: { expenses: {}, diary: { 7: 45 } } };
+  const m = C.mergeDocs(local, remote);
+  assert.deepEqual(m.diary.map(d => d.id), [8]);
+});
+
+test('mergeDocs：空的或缺欄位的文件不會出錯', () => {
+  const m = C.mergeDocs({}, { expenses: [{ id: 1, u: 1 }] });
+  assert.equal(m.expenses.length, 1);
+  assert.deepEqual(m.diary, []);
+});

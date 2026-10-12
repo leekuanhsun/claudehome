@@ -1,5 +1,5 @@
 /* 離線快取：讓存錢計畫在沒有網路時也能開啟 */
-const CACHE = 'saving-plan-v7';
+const CACHE = 'saving-plan-v8';
 const SHELL = [
   './',
   'index.html',
@@ -10,6 +10,8 @@ const SHELL = [
   'settings.html',
   'styles.css',
   'calc.js',
+  'sync.js',
+  'supabase-config.js',
   'app.js',
   'manifest.webmanifest',
   'icon.svg',

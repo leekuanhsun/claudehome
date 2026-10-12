@@ -44,6 +44,7 @@ npm start   # 在 http://localhost:8000 開啟
 | `app.js` | 共用儲存、各頁面的渲染與互動（依 `body[data-page]` 啟動） |
 | `sw.js` | Service Worker，離線快取 |
 | `manifest.webmanifest`、`icon.svg` | 加入主畫面用的設定與圖示 |
+| `sync.js`、`supabase-config.js`、`supabase/schema.sql` | 雲端同步的傳輸層、設定檔與資料庫結構 |
 | `tests/calc.test.js` | 計算邏輯的單元測試 |
 
 ## 計算方式
@@ -60,6 +61,24 @@ npm start   # 在 http://localhost:8000 開啟
 - 信用卡剩餘本金為 0 時，視為已繳清，不再扣除月付金額。
 - 未計入信用卡分期利息。
 
+## 雲端同步（手機與電腦共用資料）
+
+資料預設只存在這台裝置。要讓手機與電腦看到同一份資料，需要設定一次 Supabase（免費方案）：
+
+1. 到 https://supabase.com 建立專案。
+2. 在專案的 **SQL Editor** 貼上 `supabase/schema.sql` 的內容並執行。
+3. 在 **Authentication → URL Configuration** 設定：
+   - Site URL：`https://leekuanhsun.github.io/claudehome/`
+   - Redirect URLs：加入同一個網址
+4. 在 **Project Settings → API** 複製 **Project URL** 與 **anon public** 金鑰，填入 `supabase-config.js`。
+5. 打開設定頁，在「雲端同步」輸入 email 寄送登入連結，點信件裡的連結即可。
+
+之後在任一台裝置登入，資料就會和其他裝置同步。未登入或未設定時，應用程式仍可在本機使用。
+
+- 同步的合併規則在 `calc.js` 的 `mergeDocs`：同一筆取較新的版本，刪除會同步到其他裝置。
+- 所有資料（含照片）會存在 Supabase 的同一列資料中，每位使用者只能讀寫自己的資料（由 RLS 規則保證）。
+- 免費方案的登入信件有寄送數量限制，短時間內多次登入可能會收不到信。
+
 ## 測試
 
 ```bash
@@ -69,6 +88,6 @@ npm test
 ## 注意事項
 
 - 計算結果只是估算，未計入利息、獎金、保險扣款等變動項目。
-- 清除瀏覽器資料或換裝置，記錄會消失。
+- 未登入雲端同步時，清除瀏覽器資料或換裝置，記錄會消失；登入後資料會保存在雲端。
 - 照片會縮小後以 base64 存在瀏覽器的 localStorage，容量通常約 5MB。照片多了之後可能無法再儲存，屆時會看到「無法儲存資料」的提示。
 - 位置需要瀏覽器授權，且只在網站以 https 或 localhost 開啟時才能使用。
