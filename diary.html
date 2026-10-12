@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6f5fd0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<title>日記｜每月存錢計畫</title>
+</head>
+<body data-page="diary">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">💰 存錢計畫</a>
+    <nav class="tabs" aria-label="主要頁面">
+      <a href="index.html" data-tab="overview"><span aria-hidden="true">🏠</span>總覽</a>
+      <a href="expense.html" data-tab="expense"><span aria-hidden="true">✏️</span>記帳</a>
+      <a href="diary.html" data-tab="diary" aria-current="page"><span aria-hidden="true">📔</span>日記</a>
+      <a href="history.html" data-tab="history"><span aria-hidden="true">📋</span>明細</a>
+      <a href="plan.html" data-tab="plan"><span aria-hidden="true">🌱</span>存錢計畫</a>
+      <a href="settings.html" data-tab="settings"><span aria-hidden="true">⚙️</span>設定</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <h1>日記</h1>
+    <p>記下今天的心情、想法與照片，時間軸會依日期排列。</p>
+  </div>
+
+  <section class="card">
+    <h2>今天想記點什麼？</h2>
+    <form id="diaryForm" novalidate>
+      <div class="field"><label for="diaryDate">日期</label><input id="diaryDate" type="date" required></div>
+
+      <fieldset class="meal-field">
+        <legend class="label-s">心情（點一下選取，再點取消）</legend>
+        <div class="check-chips" id="moodChips"></div>
+      </fieldset>
+
+      <div class="field">
+        <label for="diaryText">內容</label>
+        <textarea id="diaryText" rows="5" maxlength="1000" placeholder="今天發生了什麼事…"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="diaryPhotos">照片（最多 4 張）</label>
+        <input id="diaryPhotos" type="file" accept="image/*" multiple>
+        <div class="thumbs" id="diaryPreview"></div>
+      </div>
+
+      <label class="check-row"><input id="diaryLocation" type="checkbox"> 附上目前位置</label>
+
+      <button class="btn block" type="submit">寫下這一天</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <h2>時間軸</h2>
+      <div class="monthnav">
+        <button class="btn ghost sm" id="diaryPrev" type="button" aria-label="上個月">‹</button>
+        <input id="diaryPicker" type="month" aria-label="查看月份">
+        <button class="btn ghost sm" id="diaryNext" type="button" aria-label="下個月">›</button>
+      </div>
+    </div>
+    <div id="diaryList"></div>
+    <div id="diaryEmpty" class="empty">這個月還沒有任何紀錄，寫下第一篇吧 ✨</div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
