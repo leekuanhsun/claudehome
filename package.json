@@ -2,13 +2,9 @@
   "name": "claudehome",
   "version": "1.0.0",
   "private": true,
-  "description": "每月存錢計畫：單頁式預算與存款規劃工具，可用本機伺服器在手機與電腦之間同步",
+  "description": "每月存錢計畫：單頁式預算與存款規劃工具，資料透過 Supabase 在多台裝置同步",
   "scripts": {
-    "test": "node --test",
-    "server": "node server/server.js"
+    "test": "node --test"
   },
-  "license": "UNLICENSED",
-  "engines": {
-    "node": ">=22.13"
-  }
+  "license": "UNLICENSED"
 }
