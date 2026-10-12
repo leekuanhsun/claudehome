@@ -175,6 +175,7 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .thumbs img{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .note-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;border:1px solid var(--line);vertical-align:middle;margin:2px 4px 2px 0}
 .meal-tag{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:999px;background:var(--purple-soft);color:var(--ink);font-size:12px;font-weight:600}
+.pay-tag{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:999px;background:#e7f7f0;color:var(--green);font-size:12px;font-weight:600}
 .map-link{color:var(--purple);font-size:13px;font-weight:600;text-decoration:none;margin-left:4px}
 .map-link:hover{text-decoration:underline}
 

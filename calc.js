@@ -42,6 +42,7 @@
     餐飲: ['早餐', '午餐', '晚餐', '下午茶'],
     交通: ['保養', '加油', '車票'],
   };
+  const PAY_METHODS = ['現金', '國泰刷卡', '中信刷卡', '富邦刷卡'];
   const MAX_TAG_LEN = 10;
   const MAX_CUSTOM_PER_CATEGORY = 20;
   const MAX_TAGS_PER_EXPENSE = 10;
@@ -214,7 +215,8 @@
     const meals = uniqueTags(input.meals);
     const photos = (input.photos || []).filter(validPhoto).slice(0, MAX_PHOTOS);
     const location = validLocation(input.location);
-    return { ok: true, expense: { id, date, amount, category, note, meals, photos, location } };
+    const pay = PAY_METHODS.includes(input.pay) ? input.pay : '現金';
+    return { ok: true, expense: { id, date, amount, category, pay, note, meals, photos, location } };
   }
 
   function monthSummary(expenses, month) {
@@ -225,7 +227,13 @@
     const categories = CATEGORIES
       .map(c => [c, sum(e => e.category === c)])
       .filter(([, v]) => v > 0);
-    return { list, life, outing, total: life + outing, categories };
+    // 早期沒有付款方式的紀錄歸為「未記錄」
+    const pays = PAY_METHODS
+      .map(p => [p, sum(e => e.pay === p)])
+      .filter(([, v]) => v > 0);
+    const unknown = sum(e => !e.pay);
+    if (unknown > 0) pays.push(['未記錄', unknown]);
+    return { list, life, outing, total: life + outing, categories, pays };
   }
 
   function daySummary(expenses, date, dailyLimit) {
@@ -248,8 +256,8 @@
 
   function toCsv(list) {
     const rows = [
-      ['日期', '類別', '餐別／細項', '備註', '金額'],
-      ...list.map(e => [e.date, e.category, (e.meals || []).join('、'), e.note, e.amount]),
+      ['日期', '類別', '餐別／細項', '付款方式', '備註', '金額'],
+      ...list.map(e => [e.date, e.category, (e.meals || []).join('、'), e.pay || '', e.note, e.amount]),
     ];
     return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
   }
@@ -343,6 +351,7 @@
     LIMITS,
     LABELS,
     CATEGORIES,
+    PAY_METHODS,
     PRESET_TAGS,
     MAX_TAG_LEN,
     tagsFor,

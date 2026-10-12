@@ -153,7 +153,7 @@ test('toCsv：加上 BOM、跳脫引號、防止試算表公式注入', () => {
   ]);
   assert.equal(csv.charCodeAt(0), 0xfeff);
   assert.ok(csv.includes('"\'=HYPERLINK(""x"")"'));
-  assert.ok(csv.startsWith('﻿"日期","類別","餐別／細項","備註","金額"'));
+  assert.ok(csv.startsWith('﻿"日期","類別","餐別／細項","付款方式","備註","金額"'));
 });
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
@@ -258,7 +258,7 @@ test('toCsv：餐別以頓號串接，舊資料沒有餐別也不會出錯', () 
     { id: 2, date: '2026-10-02', amount: 20, category: '交通', note: 'old' },
   ]);
   assert.ok(csv.includes('"早餐、下午茶"'));
-  assert.ok(csv.includes('"2026-10-02","交通","","old","20"'));
+  assert.ok(csv.includes('"2026-10-02","交通","","","old","20"'));
 });
 
 test('buildDiary：心情只接受固定選項，沒選就是 null', () => {
@@ -356,4 +356,20 @@ test('mergeDocs：空的或缺欄位的文件不會出錯', () => {
   const m = C.mergeDocs({}, { expenses: [{ id: 1, u: 1 }] });
   assert.equal(m.expenses.length, 1);
   assert.deepEqual(m.diary, []);
+});
+
+test('buildExpense：付款方式只接受固定選項，沒選就是現金', () => {
+  assert.equal(C.buildExpense({ date: '2026-10-12', amount: '10', category: '餐飲', pay: '中信刷卡' }, 1).expense.pay, '中信刷卡');
+  assert.equal(C.buildExpense({ date: '2026-10-12', amount: '10', category: '餐飲', pay: '亂填' }, 1).expense.pay, '現金');
+  assert.equal(C.buildExpense({ date: '2026-10-12', amount: '10', category: '餐飲' }, 1).expense.pay, '現金');
+});
+
+test('monthSummary：依付款方式統計，沒有付款方式的歸為未記錄', () => {
+  const expenses = [
+    { id: 1, date: '2026-10-01', amount: 100, category: '餐飲', pay: '現金', note: '' },
+    { id: 2, date: '2026-10-02', amount: 300, category: '購物', pay: '國泰刷卡', note: '' },
+    { id: 3, date: '2026-10-03', amount: 50, category: '交通', note: '' },
+  ];
+  const m = C.monthSummary(expenses, '2026-10');
+  assert.deepEqual(m.pays, [['現金', 100], ['國泰刷卡', 300], ['未記錄', 50]]);
 });
