@@ -11,6 +11,7 @@
     tags: 'savingPlan.v2.tags',
     tombstones: 'savingPlan.v2.tombstones',
     meta: 'savingPlan.v2.meta',
+    fx: 'savingPlan.v2.fx',
   };
   const LEGACY = { settings: 'savingPlanSettings', expenses: 'savingPlanExpenses' };
   const page = document.body.dataset.page;
@@ -53,14 +54,22 @@
     return td;
   }
 
+  const isForeign = e => !!e.currency && e.currency !== 'TWD';
+
   // 備註欄：餐別、心得、照片縮圖、位置連結
   function noteCell(e) {
     const td = document.createElement('td');
     const meals = e.meals || [];
     const photos = e.photos || [];
-    if (!meals.length && !e.note && !photos.length && !e.location && !e.pay) {
+    if (!meals.length && !e.note && !photos.length && !e.location && !e.pay && !isForeign(e)) {
       td.textContent = '—';
       return td;
+    }
+    if (isForeign(e)) {
+      const fxTag = document.createElement('span');
+      fxTag.className = 'fx-tag';
+      fxTag.textContent = `${e.currency} ${e.origAmount}`;
+      td.appendChild(fxTag);
     }
     if (e.pay) {
       const pay = document.createElement('span');
@@ -137,6 +146,7 @@
     diary = Array.isArray(storedDiary) ? storedDiary.filter(C.isValidDiary) : [];
     tombstones = readJSON([KEYS.tombstones], { expenses: {}, diary: {} });
     meta = { settingsU: 0, tagsU: 0, ...readJSON([KEYS.meta], {}) };
+    fx = readJSON([KEYS.fx], null);
   }
 
   // 只寫入本機，不觸發同步
@@ -666,6 +676,48 @@
     renderList();
   }
 
+  /* ---------- 幣別與匯率 ---------- */
+
+  let fx = null;
+  let onFxChange = () => {};
+  let fxRefreshing = false;
+
+  // 匯率每 12 小時向 open.er-api.com 更新一次；失敗時沿用上次的匯率，也可以手動修改
+  async function refreshFx() {
+    if (!C.fxIsStale(fx) || fxRefreshing) return;
+    fxRefreshing = true;
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/TWD');
+      const parsed = C.parseFx(await res.json());
+      if (parsed) {
+        fx = parsed;
+        localStorage.setItem(KEYS.fx, JSON.stringify(fx));
+        onFxChange();
+      }
+    } catch {
+      // 離線或服務暫時無法連線：沿用舊的匯率
+    } finally {
+      fxRefreshing = false;
+    }
+  }
+
+  function updateRateField() {
+    const cur = $('expCurrency').value;
+    const foreign = cur !== 'TWD';
+    $('rateField').hidden = !foreign;
+    if (!foreign) return;
+    const rate = Number($('expRate').value);
+    const amount = Number($('expAmount').value);
+    const updated = fx && fx.updated ? `（匯率更新於 ${fx.updated.slice(0, 16)}）` : '';
+    if (!$('expRate').value) {
+      $('fxPreview').textContent = '還沒有取得匯率，請手動輸入，或稍後再試' + updated;
+    } else if (amount > 0 && rate > 0) {
+      $('fxPreview').textContent = `換算成台幣：約 ${money(Math.round(amount * rate))}` + updated;
+    } else {
+      $('fxPreview').textContent = '' + updated;
+    }
+  }
+
   function initExpense() {
     fillCategories($('expCategory'));
     for (const p of C.PAY_METHODS) {
@@ -673,6 +725,24 @@
       o.textContent = p;
       $('expPay').appendChild(o);
     }
+    for (const c of C.CURRENCIES) {
+      const o = document.createElement('option');
+      o.value = c;
+      o.textContent = C.CURRENCY_LABELS[c];
+      $('expCurrency').appendChild(o);
+    }
+    $('expCurrency').addEventListener('change', () => {
+      $('expRate').value = fx && fx.twdPer[$('expCurrency').value] ? fx.twdPer[$('expCurrency').value] : '';
+      updateRateField();
+    });
+    $('expAmount').addEventListener('input', updateRateField);
+    $('expRate').addEventListener('input', updateRateField);
+    onFxChange = () => {
+      const cur = $('expCurrency').value;
+      if (cur !== 'TWD' && !$('expRate').value && fx && fx.twdPer[cur]) $('expRate').value = fx.twdPer[cur];
+      updateRateField();
+    };
+    onFxChange();
     renderTags(false);
     $('expCategory').addEventListener('change', () => renderTags(false));
     $('tagAdd').onclick = addCustomTag;
@@ -729,6 +799,8 @@
         const res = C.buildExpense({
           date: $('expDate').value,
           amount: $('expAmount').value,
+          currency: $('expCurrency').value,
+          rate: $('expRate').value,
           category: $('expCategory').value,
           pay: $('expPay').value,
           note: $('expNote').value,
@@ -930,6 +1002,7 @@
 
   load();
   if (INITS[page]) INITS[page]();
+  refreshFx();
 
   // 開啟任何頁面時同步一次；切回這個分頁時也同步
   if (cloudReady()) syncNow();

@@ -153,7 +153,7 @@ test('toCsv：加上 BOM、跳脫引號、防止試算表公式注入', () => {
   ]);
   assert.equal(csv.charCodeAt(0), 0xfeff);
   assert.ok(csv.includes('"\'=HYPERLINK(""x"")"'));
-  assert.ok(csv.startsWith('﻿"日期","類別","餐別／細項","付款方式","備註","金額"'));
+  assert.ok(csv.startsWith('﻿"日期","類別","餐別／細項","付款方式","備註","金額（台幣）","幣別","原幣金額"'));
 });
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
@@ -372,4 +372,66 @@ test('monthSummary：依付款方式統計，沒有付款方式的歸為未記�
   ];
   const m = C.monthSummary(expenses, '2026-10');
   assert.deepEqual(m.pays, [['現金', 100], ['國泰刷卡', 300], ['未記錄', 50]]);
+});
+
+/* ---------- 幣別與匯率 ---------- */
+
+test('buildExpense：台幣直接記錄，外幣依匯率換算成台幣並保留原幣金額', () => {
+  const twd = C.buildExpense({ date: '2026-10-12', amount: '250', category: '餐飲' }, 1).expense;
+  assert.equal(twd.amount, 250);
+  assert.equal(twd.currency, 'TWD');
+  assert.equal(twd.origAmount, 250);
+  assert.equal(twd.rate, 1);
+
+  const usd = C.buildExpense({ date: '2026-10-12', amount: '10.5', category: '購物', currency: 'USD', rate: 31.2 }, 2).expense;
+  assert.equal(usd.amount, 328, '10.5 × 31.2 = 327.6，四捨五入為 328');
+  assert.equal(usd.currency, 'USD');
+  assert.equal(usd.origAmount, 10.5);
+  assert.equal(usd.rate, 31.2);
+});
+
+test('buildExpense：外幣沒有匯率時拒絕，不會默默記成 0 元', () => {
+  const r = C.buildExpense({ date: '2026-10-12', amount: '10', category: '購物', currency: 'JPY' }, 1);
+  assert.equal(r.ok, false);
+  assert.equal(r.field, 'currency');
+  const bad = C.buildExpense({ date: '2026-10-12', amount: '10', category: '購物', currency: 'JPY', rate: 0 }, 1);
+  assert.equal(bad.ok, false);
+});
+
+test('buildExpense：不認識的幣別當成台幣', () => {
+  const r = C.buildExpense({ date: '2026-10-12', amount: '10', category: '餐飲', currency: 'XYZ' }, 1);
+  assert.equal(r.expense.currency, 'TWD');
+});
+
+test('parseFx：把「每台幣換多少外幣」轉成「每外幣值多少台幣」', () => {
+  const fx = C.parseFx({
+    result: 'success',
+    time_last_update_utc: 'Mon, 12 Oct 2026 00:00:01 +0000',
+    rates: { TWD: 1, USD: 0.032, JPY: 4.8 },
+  }, 1000);
+  assert.equal(fx.fetchedAt, 1000);
+  assert.equal(fx.twdPer.TWD, 1);
+  assert.equal(fx.twdPer.USD, 31.25);
+  assert.equal(fx.twdPer.JPY, 0.2083);
+  assert.equal(fx.twdPer.EUR, undefined, '沒有回傳的幣別不會出現');
+});
+
+test('parseFx：回應不是成功時回傳 null', () => {
+  assert.equal(C.parseFx({ result: 'error' }), null);
+  assert.equal(C.parseFx(null), null);
+  assert.equal(C.parseFx({ result: 'success' }), null);
+});
+
+test('fxIsStale：超過 12 小時或沒有資料就要重新取得', () => {
+  const now = 100 * 60 * 60 * 1000;
+  assert.equal(C.fxIsStale(null, now), true);
+  assert.equal(C.fxIsStale({ fetchedAt: now - 60 * 1000 }, now), false);
+  assert.equal(C.fxIsStale({ fetchedAt: now - 13 * 60 * 60 * 1000 }, now), true);
+});
+
+test('toCsv：有幣別時附上原幣金額', () => {
+  const csv = C.toCsv([
+    { id: 1, date: '2026-10-01', amount: 328, category: '購物', note: '', currency: 'USD', origAmount: 10.5 },
+  ]);
+  assert.ok(csv.includes('"328","USD","10.5"'));
 });

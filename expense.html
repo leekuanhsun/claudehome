@@ -35,9 +35,22 @@
     <form class="card" id="expForm" novalidate>
       <div class="form-grid">
         <div class="field"><label for="expDate">日期</label><input id="expDate" type="date" required></div>
-        <div class="field"><label for="expAmount">金額（元）</label><input id="expAmount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="例如：185" required></div>
+        <div class="field">
+          <label for="expAmount">金額</label>
+          <div class="amount-row">
+            <input id="expAmount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="例如：185" required>
+            <select id="expCurrency" aria-label="幣別"></select>
+          </div>
+        </div>
         <div class="field"><label for="expCategory">類別</label><select id="expCategory"></select></div>
         <div class="field"><label for="expPay">付款方式</label><select id="expPay"></select></div>
+      </div>
+
+      <div class="field" id="rateField" hidden>
+        <label for="expRate">匯率（1 外幣 ＝ 多少台幣）</label>
+        <input id="expRate" type="number" inputmode="decimal" min="0" step="0.0001" placeholder="取得中…">
+        <p class="hint" id="fxPreview"></p>
+        <p class="hint">匯率來源：<a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">Rates By Exchange Rate API</a>，每日更新，可以手動修改。</p>
       </div>
 
       <fieldset class="meal-field">
