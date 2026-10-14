@@ -240,6 +240,37 @@
     }
   }
 
+  // 登出時清除這台裝置上的記帳資料，避免其他人用同一台裝置看到
+  function clearLocalData() {
+    for (const k of [...Object.values(KEYS), ...Object.values(LEGACY)]) localStorage.removeItem(k);
+  }
+
+  function initLogin() {
+    if (!cloudReady()) {
+      setSyncStatus('尚未設定雲端同步：請在 supabase-config.js 填入 Supabase 的網址。');
+      return;
+    }
+    if (SavingPlanCloud.currentUser()) {
+      location.replace('index.html');
+      return;
+    }
+    $('loginForm').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const email = $('loginUser').value.trim();
+      const password = $('loginPass').value;
+      if (!email || !password) {
+        toast('請輸入電子郵件與密碼');
+        return;
+      }
+      try {
+        await SavingPlanCloud.signIn(email, password);
+        location.replace('index.html');
+      } catch (e) {
+        toast(e.message);
+      }
+    });
+  }
+
   function initCloudPanel() {
     const render = () => {
       const user = SavingPlanCloud.currentUser();
@@ -277,9 +308,11 @@
     });
     $('syncNowBtn').onclick = () => syncNow();
     $('logoutBtn').onclick = async () => {
+      if (!confirm('登出後會清除這台裝置上的記帳資料（雲端的資料不會刪除），確定登出？')) return;
+      await syncNow();
       await SavingPlanCloud.signOut();
-      toast('已登出，資料仍保留在這台裝置');
-      render();
+      clearLocalData();
+      location.replace('login.html');
     };
     render();
   }
@@ -988,15 +1021,23 @@
     settings: initSettings,
   };
 
-  load();
-  if (INITS[page]) INITS[page]();
-  refreshFx();
+  // 設定了雲端同步時，沒有登入就只能看登入頁，別人看不到這台裝置上的資料
+  const locked = cloudReady() && !SavingPlanCloud.currentUser();
+  if (page === 'login') {
+    initLogin();
+  } else if (locked) {
+    location.replace('login.html');
+  } else {
+    load();
+    if (INITS[page]) INITS[page]();
+    refreshFx();
 
-  // 開啟任何頁面時同步一次；切回這個分頁時也同步
-  if (cloudReady()) syncNow();
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) syncNow();
-  });
+    // 開啟任何頁面時同步一次；切回這個分頁時也同步
+    if (cloudReady()) syncNow();
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) syncNow();
+    });
+  }
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
