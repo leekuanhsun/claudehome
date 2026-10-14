@@ -76,6 +76,11 @@ npm start   # 在 http://localhost:8000 開啟
 - 未登入或未設定時，應用程式仍可在本機使用。
 - 免費專案一週沒有任何人使用會被暫停；平常使用就不會。
 
+### 新增使用者與帳號安全
+- **新增使用者**：到 Supabase 的 **Authentication → Users → Add user**，輸入對方的電子郵件與密碼，勾選 **Auto Confirm User**。每個人的資料是分開的。
+- **關閉陌生人註冊**：到 **Authentication → Sign In / Providers**，關閉 **Allow new users to sign up**，避免陌生人用 API 自行註冊。
+- 網站沒有登入就只會看到登入頁；登出時會清除這台裝置上的記帳資料，雲端的資料不會刪除。
+
 ## 測試
 
 ```bash
