@@ -587,8 +587,9 @@
   function mergeAccountDocs(local, remote) {
     const a = normalizeAccount(local);
     const b = normalizeAccount(remote);
+    // 同一位使用者取較新的一份（名字、頭像的修改時間 u 比較晚的獲勝）
     const byId = new Map();
-    for (const item of [...a.list, ...b.list]) byId.set(item.id, item);
+    for (const item of [...a.list, ...b.list]) byId.set(item.id, newerOf(byId.get(item.id), item));
     const profiles = {};
     for (const id of new Set([...Object.keys(a.profiles), ...Object.keys(b.profiles)])) {
       profiles[id] = mergeDocs(a.profiles[id] || emptyDoc(), b.profiles[id] || emptyDoc());
