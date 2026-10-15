@@ -29,6 +29,20 @@
         <button class="btn" type="submit">建立並進入</button>
       </div>
     </form>
+
+    <form id="editProfileForm" class="cloud-form edit-form" hidden>
+      <h2>編輯使用者</h2>
+      <div class="edit-preview"><div class="avatar big" id="editPreview"></div></div>
+      <div class="field"><label for="editNameInput">名字</label><input id="editNameInput" type="text" maxlength="10" autocomplete="off"></div>
+      <p class="muted">頭像顏色</p>
+      <div class="color-choices" id="colorChoices"></div>
+      <div class="field"><label for="editPhotoInput">頭像照片（選填）</label><input id="editPhotoInput" type="file" accept="image/*"></div>
+      <div class="actions">
+        <button class="btn" type="submit">儲存</button>
+        <button class="btn ghost" id="removePhotoBtn" type="button">移除照片</button>
+        <button class="btn ghost" id="cancelEditBtn" type="button">取消</button>
+      </div>
+    </form>
   </section>
 
   <p class="center"><button class="link-btn" id="logoutLink" type="button">登出（換帳號）</button></p>

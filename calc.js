@@ -458,6 +458,7 @@
     effectiveCardPay,
     plan,
     isValidExpense,
+    validPhoto,
     buildExpense,
     monthSummary,
     daySummary,
