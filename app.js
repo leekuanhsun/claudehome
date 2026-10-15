@@ -333,7 +333,7 @@
     addBtn.textContent = '+';
     addBtn.setAttribute('aria-label', '新增使用者');
     addBtn.onclick = () => {
-      $('newProfile').hidden = false;
+      $('newProfileForm').hidden = false;
       $('profileNameInput').focus();
     };
     const addName = document.createElement('span');
