@@ -1,5 +1,5 @@
 /* 離線快取：讓存錢計畫在沒有網路時也能開啟 */
-const CACHE = 'saving-plan-v15';
+const CACHE = 'saving-plan-v16';
 const SHELL = [
   './',
   'login.html',

@@ -181,6 +181,17 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .map-link{color:var(--purple);font-size:13px;font-weight:600;text-decoration:none;margin-left:4px}
 .map-link:hover{text-decoration:underline}
 
+/* ---------- 使用者選擇（登入頁） ---------- */
+.picker{text-align:center}
+.picker h1{font-size:28px;margin-bottom:24px}
+.profiles{display:flex;flex-wrap:wrap;justify-content:center;gap:24px}
+.profile{display:flex;flex-direction:column;align-items:center;gap:8px;width:120px}
+.avatar{width:96px;height:96px;min-height:96px;border-radius:14px;border:0;padding:0;display:grid;place-items:center;font-size:40px;font-weight:800;color:#fff;cursor:pointer;background:var(--purple)}
+.avatar:hover{outline:3px solid var(--ink);outline-offset:2px}
+.avatar.add{background:#fff;border:2px dashed var(--line);color:var(--muted);font-size:44px;font-weight:400}
+.profile-name{font-weight:700;color:var(--ink);overflow-wrap:anywhere;text-align:center}
+.picker .link-btn{font-size:13px}
+
 /* ---------- 雲端同步 ---------- */
 .cloud-form{display:grid;gap:12px;margin-top:12px}
 .cloud-form .actions{margin-top:0;justify-content:flex-start}
