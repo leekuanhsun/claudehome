@@ -42,7 +42,8 @@
   <section class="grid g3">
     <div class="card stat"><div class="label">生活費（不含聚會）</div><div class="value" id="sumLife">—</div></div>
     <div class="card stat"><div class="label">朋友聚會</div><div class="value" id="sumOuting">—</div></div>
-    <div class="card stat"><div class="label">本月支出總計</div><div class="value" id="sumTotal">—</div></div>
+    <div class="card stat"><div class="label">本月支出總計（不含繳卡費）</div><div class="value" id="sumTotal">—</div></div>
+    <div class="card stat"><div class="label">本月收入</div><div class="value" id="sumIncome">—</div></div>
   </section>
 
   <section class="grid g2">
@@ -52,12 +53,15 @@
       <div class="bar"><span id="lifeBar"></span></div>
       <div class="row small"><span>朋友聚會</span><span id="outingText">—</span></div>
       <div class="bar"><span id="outingBar"></span></div>
+      <div class="row small"><span>繳卡費（不計入總支出）</span><span id="cardPayText">—</span></div>
     </div>
     <div class="card">
       <h2>分類</h2>
       <div id="catBreakdown"></div>
       <h2 class="mt">付款方式</h2>
       <div id="payBreakdown"></div>
+      <h2 class="mt">收入來源</h2>
+      <div id="incomeBreakdown"></div>
     </div>
   </section>
 

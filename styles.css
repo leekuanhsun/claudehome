@@ -185,6 +185,10 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .amount-row{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px}
 .fx-tag{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:999px;background:#e8f0ff;color:#2d4f9e;font-size:12px;font-weight:600}
 .pay-tag{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:999px;background:#e7f7f0;color:var(--green);font-size:12px;font-weight:600}
+.income-tag{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:999px;background:#e6f0ff;color:#2d6fb0;font-size:12px;font-weight:600}
+.amount.income{color:var(--green)}
+.kind-toggle{display:flex;gap:8px;margin-bottom:12px}
+.kind-toggle .chip[aria-pressed="true"]{background:var(--purple);color:#fff}
 .map-link{color:var(--purple);font-size:13px;font-weight:600;text-decoration:none;margin-left:4px}
 .map-link:hover{text-decoration:underline}
 

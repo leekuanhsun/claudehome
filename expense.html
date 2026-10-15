@@ -33,6 +33,10 @@
 
   <section class="grid expense-layout">
     <form class="card" id="expForm" novalidate>
+      <div class="kind-toggle" role="group" aria-label="記帳種類">
+        <button class="chip" id="kindExpense" type="button" aria-pressed="true">支出</button>
+        <button class="chip" id="kindIncome" type="button" aria-pressed="false">收入</button>
+      </div>
       <div class="form-grid">
         <div class="field"><label for="expDate">日期</label><input id="expDate" type="date" required></div>
         <div class="field">
@@ -43,7 +47,7 @@
           </div>
         </div>
         <div class="field"><label for="expCategory">類別</label><select id="expCategory"></select></div>
-        <div class="field"><label for="expPay">付款方式</label><select id="expPay"></select></div>
+        <div class="field"><label for="expPay" id="payLabel">付款方式</label><select id="expPay"></select></div>
       </div>
 
       <div class="field" id="rateField" hidden>
@@ -53,7 +57,7 @@
         <p class="hint">匯率來源：<a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">Rates By Exchange Rate API</a>，每日更新，可以手動修改。</p>
       </div>
 
-      <fieldset class="meal-field">
+      <fieldset class="meal-field" id="mealField">
         <legend class="label-s" id="tagLegend">餐別（可複選）</legend>
         <div class="check-chips" id="mealChips"></div>
         <div class="tag-add">
@@ -73,7 +77,7 @@
         </div>
       </div>
 
-      <div class="field">
+      <div class="field" id="photoField">
         <label for="expPhotos">紀錄／照片（選填，最多 3 張）</label>
         <input id="expPhotos" type="file" accept="image/*" multiple>
         <div class="thumbs" id="photoPreview"></div>
@@ -84,9 +88,9 @@
         <textarea id="expNote" maxlength="500" rows="3" placeholder="例如：這家店很好吃，下次還要再來"></textarea>
       </div>
 
-      <label class="check-row"><input id="expLocation" type="checkbox"> 附上目前位置</label>
+      <label class="check-row" id="locationField"><input id="expLocation" type="checkbox"> 附上目前位置</label>
 
-      <button class="btn block" type="submit">記錄支出</button>
+      <button class="btn block" id="submitBtn" type="submit">記錄支出</button>
     </form>
 
     <aside class="card">
