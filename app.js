@@ -12,6 +12,7 @@
     tombstones: 'savingPlan.v2.tombstones',
     meta: 'savingPlan.v2.meta',
     fx: 'savingPlan.v2.fx',
+    acct: 'savingPlan.v3.acct',
   };
   const LEGACY = { settings: 'savingPlanSettings', expenses: 'savingPlanExpenses' };
   const page = document.body.dataset.page;
@@ -20,6 +21,8 @@
   let expenses = [];
   let diary = [];
   let customTags = {};
+  // 同一帳號底下的使用者：{ active: 目前使用者 id, list: [{id, name}], data: {使用者 id: 文件} }
+  let acct = null;
   // 刪除記錄：{ expenses: {id: 刪除時間}, diary: {...} }，讓其他裝置同步時也會刪掉
   let tombstones = { expenses: {}, diary: {} };
   // 設定與細項最後修改的時間，用來決定同步時哪一份較新
@@ -147,6 +150,8 @@
     tombstones = readJSON([KEYS.tombstones], { expenses: {}, diary: {} });
     meta = { settingsU: 0, tagsU: 0, ...readJSON([KEYS.meta], {}) };
     fx = readJSON([KEYS.fx], null);
+    acct = readJSON([KEYS.acct], null);
+    if (acct && acct.active && acct.data && acct.data[acct.active]) applyDoc(acct.data[acct.active]);
   }
 
   // 只寫入本機，不觸發同步
@@ -157,6 +162,10 @@
     localStorage.setItem(KEYS.tags, JSON.stringify(customTags));
     localStorage.setItem(KEYS.tombstones, JSON.stringify(tombstones));
     localStorage.setItem(KEYS.meta, JSON.stringify(meta));
+    if (acct && acct.active) {
+      acct.data = { ...(acct.data || {}), [acct.active]: toDoc() };
+      localStorage.setItem(KEYS.acct, JSON.stringify(acct));
+    }
   }
 
   function save() {
@@ -224,7 +233,7 @@
         return;
       }
       setSyncStatus('同步中…');
-      applyDoc(await SavingPlanCloud.exchange(toDoc()));
+      applyAccountDoc(await SavingPlanCloud.exchange(accountDoc()));
       const time = new Date().toLocaleTimeString('zh-Hant', { hour: '2-digit', minute: '2-digit' });
       setSyncStatus(`已同步（${time}）`);
       onChange();
@@ -238,6 +247,124 @@
         scheduleSync();
       }
     }
+  }
+
+  /* ---------- 同一帳號下的使用者（像 Netflix 的「誰在用？」） ---------- */
+
+  function activeProfile() {
+    if (!acct || !acct.active) return null;
+    return (acct.list || []).find(p => p.id === acct.active) || null;
+  }
+
+  function hasLocalData() {
+    return expenses.length > 0 || diary.length > 0 || meta.settingsU > 0 || meta.tagsU > 0 || Object.keys(customTags).length > 0;
+  }
+
+  // 第一次使用時建立使用者清單；舊版本已有的資料會放進「我」這位使用者
+  function ensureAcct() {
+    if (acct) return;
+    acct = { active: null, list: [], data: {} };
+    if (hasLocalData()) {
+      acct.list = [{ id: 'p1', name: '我' }];
+      acct.active = 'p1';
+    }
+    writeLocal();
+  }
+
+  // 同步時送出整個帳號（所有使用者的資料）
+  function accountDoc() {
+    const profiles = { ...((acct && acct.data) || {}) };
+    if (acct && acct.active) profiles[acct.active] = toDoc();
+    return { list: (acct && acct.list) || [], profiles };
+  }
+
+  function applyAccountDoc(merged) {
+    acct = acct || { active: null, list: [], data: {} };
+    acct.list = merged.list || [];
+    acct.data = { ...(merged.profiles || {}) };
+    const current = acct.active && acct.data[acct.active];
+    if (current) applyDoc(current);
+    else writeLocal();
+  }
+
+  function switchProfile(id) {
+    if (!acct) return;
+    writeLocal();
+    acct.active = id;
+    applyDoc((acct.data && acct.data[id]) || C.emptyDoc());
+  }
+
+  function createProfile(name) {
+    ensureAcct();
+    const id = 'p' + Date.now().toString(36);
+    acct.list = [...(acct.list || []), { id, name }];
+    acct.data = { ...(acct.data || {}), [id]: C.emptyDoc() };
+    switchProfile(id);
+    scheduleSync();
+  }
+
+  function renderProfiles() {
+    const grid = $('profileGrid');
+    grid.textContent = '';
+    (acct && acct.list || []).forEach((p, i) => {
+      const item = document.createElement('div');
+      item.className = 'profile';
+      const avatar = document.createElement('button');
+      avatar.type = 'button';
+      avatar.className = 'avatar';
+      avatar.style.background = PROFILE_COLORS[i % PROFILE_COLORS.length];
+      avatar.textContent = p.name.charAt(0);
+      avatar.setAttribute('aria-label', `使用 ${p.name}`);
+      avatar.onclick = () => {
+        switchProfile(p.id);
+        location.replace('index.html');
+      };
+      const name = document.createElement('span');
+      name.className = 'profile-name';
+      name.textContent = p.name;
+      item.append(avatar, name);
+      grid.appendChild(item);
+    });
+    const add = document.createElement('div');
+    add.className = 'profile';
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'avatar add';
+    addBtn.textContent = '+';
+    addBtn.setAttribute('aria-label', '新增使用者');
+    addBtn.onclick = () => {
+      $('newProfile').hidden = false;
+      $('profileNameInput').focus();
+    };
+    const addName = document.createElement('span');
+    addName.className = 'profile-name';
+    addName.textContent = '新增使用者';
+    add.append(addBtn, addName);
+    grid.appendChild(add);
+  }
+
+  function initProfiles() {
+    ensureAcct();
+    onChange = renderProfiles;
+    renderProfiles();
+    $('newProfileForm').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const name = $('profileNameInput').value.trim();
+      if (!name) {
+        toast('請輸入名字');
+        return;
+      }
+      createProfile(name);
+      location.replace('index.html');
+    });
+    $('logoutLink').onclick = async () => {
+      if (!confirm('登出後會清除這台裝置上的記帳資料（雲端的資料不會刪除），確定登出？')) return;
+      await syncNow();
+      await SavingPlanCloud.signOut();
+      clearLocalData();
+      location.replace('login.html');
+    };
+    syncNow();
   }
 
   // 登出時清除這台裝置上的記帳資料，避免其他人用同一台裝置看到
@@ -359,7 +486,7 @@
       try {
         await SavingPlanCloud.signIn(email, password);
         rememberProfile(email);
-        location.replace('index.html');
+        location.replace('profiles.html');
       } catch (e) {
         toast(e.message);
       }
@@ -390,7 +517,7 @@
         const result = await SavingPlanCloud.signUp(email, password);
         if (result === 'signed-in') {
           rememberProfile(email);
-          location.replace('index.html');
+          location.replace('profiles.html');
         } else {
           toast('註冊成功，請到信箱點擊確認連結後登入');
           showLoginForm(email);
@@ -406,6 +533,8 @@
       const user = SavingPlanCloud.currentUser();
       $('loginForm').hidden = !!user || !cloudReady();
       $('signedIn').hidden = !user;
+      const current = activeProfile();
+      $('currentProfileName').textContent = current ? current.name : '尚未選擇';
       if (user) {
         $('signedUser').textContent = user.username;
         setSyncStatus('已登入，手機與電腦的資料會同步。');
@@ -1157,16 +1286,26 @@
     initLogin();
   } else if (locked) {
     location.replace('login.html');
+  } else if (page === 'profiles' && !cloudReady()) {
+    location.replace('index.html');
   } else {
     load();
-    if (INITS[page]) INITS[page]();
-    refreshFx();
+    if (cloudReady()) ensureAcct();
+    if (page === 'profiles') {
+      initProfiles();
+    } else if (cloudReady() && !activeProfile()) {
+      // 還沒選擇使用者：先到選擇頁
+      location.replace('profiles.html');
+    } else {
+      if (INITS[page]) INITS[page]();
+      refreshFx();
 
-    // 開啟任何頁面時同步一次；切回這個分頁時也同步
-    if (cloudReady()) syncNow();
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) syncNow();
-    });
+      // 開啟任何頁面時同步一次；切回這個分頁時也同步
+      if (cloudReady()) syncNow();
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) syncNow();
+      });
+    }
   }
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

@@ -42,6 +42,7 @@ npm start   # 在 http://localhost:8000 開啟
 | `styles.css` | 共用樣式與響應式版面 |
 | `calc.js` | 計算邏輯（不碰 DOM，可單獨測試） |
 | `app.js` | 共用儲存、各頁面的渲染與互動（依 `body[data-page]` 啟動） |
+| `profiles.html` | 「誰在用？」頁：選擇使用者或新增使用者 |
 | `sw.js` | Service Worker，離線快取 |
 | `manifest.webmanifest`、`icon.svg` | 加入主畫面用的設定與圖示 |
 | `sync.js`、`supabase-config.js`、`supabase/schema.sql` | 雲端同步（Supabase）的傳輸層、設定與資料表 |
@@ -80,9 +81,10 @@ npm start   # 在 http://localhost:8000 開啟
 - **管理者新增使用者**（不開放註冊）：到 Supabase 的 **Authentication → Users → Add user**，輸入對方的電子郵件與密碼，勾選 **Auto Confirm User**。
 - **讓別人自行註冊**：登入頁的「沒有帳號？註冊新帳號」可以註冊。這需要在 **Authentication → Sign In / Providers** 開啟 **Allow new users to sign up**。開啟後任何知道網址的人都能註冊，但註冊後只能看到自己的空白資料。
 - **不想讓陌生人註冊**：關閉 **Allow new users to sign up**，只用 Add user 建立帳號；登入頁的註冊會顯示「目前不開放註冊」。
+- **同一帳號多位使用者**：登入後會到「誰在用？」頁，像 Netflix 一樣選擇使用者，不需要密碼。每位使用者的記帳與日記資料分開，但都存在同一個帳號的雲端資料裡。可按「+ 新增使用者」建立，設定頁也能按「切換使用者」。舊資料會歸到「我」這位使用者。
 - **切換帳號**：設定頁按「登出／切換帳號」，會清除這台裝置上的記帳資料（雲端的資料不會刪除），再到登入頁登入其他帳號。
 - 網站沒有登入就只會看到登入頁，登出時會清除這台裝置上的記帳資料。
-- 登入頁會像 Netflix 一樣列出這台裝置上登入過的使用者（只記電子郵件，不記密碼）。點頭像輸入密碼即可登入；「新增使用者」可以登入其他帳號或註冊。
+- 登入頁會列出這台裝置上登入過的帳號（只記電子郵件，不記密碼）。點頭像輸入密碼即可登入；「新增使用者」可以登入其他帳號或註冊。
 
 ## 測試
 
