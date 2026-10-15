@@ -1,5 +1,5 @@
 /* 離線快取：讓存錢計畫在沒有網路時也能開啟 */
-const CACHE = 'saving-plan-v21';
+const CACHE = 'saving-plan-v22';
 const SHELL = [
   './',
   'login.html',
@@ -35,11 +35,14 @@ self.addEventListener('activate', ev => {
 self.addEventListener('fetch', ev => {
   const req = ev.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // 網路優先：每次先抓最新版，離線時才用快取，避免更新後還停在舊畫面
   ev.respondWith(
-    caches.match(req).then(hit => hit || fetch(req).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(req, copy));
+    fetch(req).then(res => {
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy));
+      }
       return res;
-    }))
+    }).catch(() => caches.match(req))
   );
 });
