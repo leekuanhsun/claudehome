@@ -77,9 +77,11 @@ npm start   # 在 http://localhost:8000 開啟
 - 免費專案一週沒有任何人使用會被暫停；平常使用就不會。
 
 ### 新增使用者與帳號安全
-- **新增使用者**：到 Supabase 的 **Authentication → Users → Add user**，輸入對方的電子郵件與密碼，勾選 **Auto Confirm User**。每個人的資料是分開的。
-- **關閉陌生人註冊**：到 **Authentication → Sign In / Providers**，關閉 **Allow new users to sign up**，避免陌生人用 API 自行註冊。
-- 網站沒有登入就只會看到登入頁；登出時會清除這台裝置上的記帳資料，雲端的資料不會刪除。
+- **管理者新增使用者**（不開放註冊）：到 Supabase 的 **Authentication → Users → Add user**，輸入對方的電子郵件與密碼，勾選 **Auto Confirm User**。
+- **讓別人自行註冊**：登入頁的「沒有帳號？註冊新帳號」可以註冊。這需要在 **Authentication → Sign In / Providers** 開啟 **Allow new users to sign up**。開啟後任何知道網址的人都能註冊，但註冊後只能看到自己的空白資料。
+- **不想讓陌生人註冊**：關閉 **Allow new users to sign up**，只用 Add user 建立帳號；登入頁的註冊會顯示「目前不開放註冊」。
+- **切換帳號**：設定頁按「登出／切換帳號」，會清除這台裝置上的記帳資料（雲端的資料不會刪除），再到登入頁登入其他帳號。
+- 網站沒有登入就只會看到登入頁，登出時會清除這台裝置上的記帳資料。
 
 ## 測試
 

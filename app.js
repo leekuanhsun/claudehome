@@ -269,6 +269,44 @@
         toast(e.message);
       }
     });
+
+    const showLogin = () => {
+      $('signupCard').hidden = true;
+      $('loginCard').hidden = false;
+    };
+    $('showSignup').onclick = () => {
+      $('loginCard').hidden = true;
+      $('signupCard').hidden = false;
+    };
+    $('backToLogin').onclick = showLogin;
+    $('signupForm').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const email = $('signupUser').value.trim();
+      const password = $('signupPass').value;
+      if (!email || !password) {
+        toast('請輸入電子郵件與密碼');
+        return;
+      }
+      if (password.length < 6) {
+        toast('密碼至少要 6 個字');
+        return;
+      }
+      if (password !== $('signupPass2').value) {
+        toast('兩次輸入的密碼不一樣');
+        return;
+      }
+      try {
+        const result = await SavingPlanCloud.signUp(email, password);
+        if (result === 'signed-in') {
+          location.replace('index.html');
+        } else {
+          toast('註冊成功，請到信箱點擊確認連結後登入');
+          showLogin();
+        }
+      } catch (e) {
+        toast(e.message);
+      }
+    });
   }
 
   function initCloudPanel() {
