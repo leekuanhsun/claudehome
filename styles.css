@@ -272,3 +272,12 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
   .monthnav input{min-width:0;flex:1}
   .page-head.row{align-items:stretch}
 }
+
+/* 編輯使用者 */
+.edit-form{text-align:left;margin-top:24px}
+.edit-form h2{text-align:center}
+.edit-preview{display:grid;place-items:center}
+.avatar.big{width:120px;height:120px;min-height:120px;font-size:52px}
+.color-choices{display:flex;gap:10px;flex-wrap:wrap}
+.color-choices button{width:40px;height:40px;border-radius:10px;border:3px solid transparent;cursor:pointer;padding:0}
+.color-choices button[aria-pressed=true]{border-color:var(--ink);outline:2px solid #fff;outline-offset:-5px}

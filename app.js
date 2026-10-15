@@ -318,8 +318,7 @@
       const avatar = document.createElement('button');
       avatar.type = 'button';
       avatar.className = 'avatar';
-      avatar.style.background = PROFILE_COLORS[i % PROFILE_COLORS.length];
-      avatar.textContent = p.name.charAt(0);
+      paintAvatar(avatar, p, p.color || PROFILE_COLORS[i % PROFILE_COLORS.length]);
       avatar.setAttribute('aria-label', `使用 ${p.name}`);
       avatar.onclick = () => {
         switchProfile(p.id);
@@ -328,7 +327,12 @@
       const name = document.createElement('span');
       name.className = 'profile-name';
       name.textContent = p.name;
-      item.append(avatar, name);
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'link-btn';
+      edit.textContent = '編輯';
+      edit.onclick = () => openEditor(p, i);
+      item.append(avatar, name, edit);
       grid.appendChild(item);
     });
     const add = document.createElement('div');
@@ -349,6 +353,55 @@
     grid.appendChild(add);
   }
 
+  // 畫出頭像：有照片就用照片，否則用顏色加上名字第一個字
+  function paintAvatar(el, p, color) {
+    if (p.photo) {
+      el.style.background = `center / cover no-repeat url("${p.photo}")`;
+      el.textContent = '';
+    } else {
+      el.style.background = color;
+      el.textContent = p.name.charAt(0);
+    }
+  }
+
+  let editingId = null;
+  let draft = null;
+
+  function openEditor(p, i) {
+    editingId = p.id;
+    draft = { name: p.name, color: p.color || PROFILE_COLORS[i % PROFILE_COLORS.length], photo: p.photo || null };
+    $('editNameInput').value = draft.name;
+    $('newProfileForm').hidden = true;
+    $('editProfileForm').hidden = false;
+    renderEditor();
+    $('editNameInput').focus();
+  }
+
+  function renderEditor() {
+    paintAvatar($('editPreview'), draft, draft.color);
+    const choices = $('colorChoices');
+    choices.textContent = '';
+    for (const c of PROFILE_COLORS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.style.background = c;
+      b.setAttribute('aria-label', '選擇這個顏色');
+      b.setAttribute('aria-pressed', String(c === draft.color));
+      b.onclick = () => {
+        draft.color = c;
+        renderEditor();
+      };
+      choices.appendChild(b);
+    }
+    $('removePhotoBtn').hidden = !draft.photo;
+  }
+
+  function closeEditor() {
+    editingId = null;
+    draft = null;
+    $('editProfileForm').hidden = true;
+  }
+
   function initProfiles() {
     ensureAcct();
     onChange = renderProfiles;
@@ -363,6 +416,48 @@
       createProfile(name);
       location.replace('index.html');
     });
+    $('editProfileForm').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const name = $('editNameInput').value.trim();
+      if (!name) {
+        toast('請輸入名字');
+        return;
+      }
+      const p = (acct.list || []).find(x => x.id === editingId);
+      if (!p) {
+        closeEditor();
+        return;
+      }
+      p.name = name;
+      p.color = draft.color;
+      if (draft.photo) p.photo = draft.photo;
+      else delete p.photo;
+      writeLocal();
+      scheduleSync();
+      closeEditor();
+      renderProfiles();
+      toast('已儲存');
+    });
+    $('editPhotoInput').addEventListener('change', async ev => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file || !draft) return;
+      try {
+        const url = await compressImage(file, 160);
+        if (!C.validPhoto(url)) throw new Error('照片太大，請換一張');
+        draft.photo = url;
+        renderEditor();
+      } catch (e) {
+        toast(e.message);
+      }
+    });
+    $('removePhotoBtn').onclick = () => {
+      if (!draft) return;
+      draft.photo = null;
+      renderEditor();
+    };
+    $('cancelEditBtn').onclick = closeEditor;
+
     $('logoutLink').onclick = async () => {
       if (!confirm('登出後會清除這台裝置上的記帳資料（雲端的資料不會刪除），確定登出？')) return;
       await syncNow();
