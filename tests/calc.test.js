@@ -202,10 +202,10 @@ test('removeCustomTag：只移除指定類別的細項', () => {
   assert.deepEqual(r, { 交通: ['停車'], 購物: ['洗車'] });
 });
 
-test('sanitizeCustomTags：忽略未知類別與不合法的資料', () => {
+test('sanitizeCustomTags：忽略名稱不合法的類別與不合法的資料', () => {
   const s = C.sanitizeCustomTags({
     交通: ['洗車', '洗車', '  ', 'x'.repeat(50)],
-    不存在的類別: ['abc'],
+    ['x'.repeat(20)]: ['abc'],
     餐飲: 'not-an-array',
   });
   assert.deepEqual(s, { 交通: ['洗車'] });
@@ -507,4 +507,69 @@ test('收入的 CSV 會標示收支，並把帳戶放在付款方式欄', () => 
   assert.ok(csv.includes('"薪資"'));
   assert.ok(csv.includes('"銀行帳戶"'));
   assert.ok(csv.trimEnd().endsWith('"收入"'));
+});
+
+test('清單編輯：新增、改名、刪除，並保護固定項目', () => {
+  const names = ['餐飲', '交通'];
+  assert.equal(C.addName(names, ' 寵物 ').names.at(-1), '寵物');
+  assert.equal(C.addName(names, '餐飲').ok, false);
+  assert.equal(C.addName(names, '').ok, false);
+  assert.equal(C.addName(names, 'x'.repeat(11)).ok, false);
+  assert.deepEqual(C.renameName(names, '交通', '通勤').names, ['餐飲', '通勤']);
+  assert.equal(C.renameName(names, '交通', '餐飲').ok, false);
+  assert.equal(C.renameName(['朋友聚會', '餐飲'], '朋友聚會', '聚會', ['朋友聚會']).ok, false);
+  assert.equal(C.removeName(names, '交通').names.length, 1);
+  assert.equal(C.removeName(['只剩一個'], '只剩一個').ok, false);
+  assert.equal(C.removeName(['朋友聚會', '餐飲'], '朋友聚會', ['朋友聚會']).ok, false);
+});
+
+test('付款方式改名或改刷卡設定時保留刷卡旗標', () => {
+  const pays = [{ name: '現金', card: false }, { name: '國泰刷卡', card: true }];
+  const renamed = C.renamePay(pays, '國泰刷卡', '國泰信用卡');
+  assert.deepEqual(renamed.pays[1], { name: '國泰信用卡', card: true });
+  assert.deepEqual(C.setPayCard(pays, '現金', true)[0], { name: '現金', card: true });
+  assert.equal(C.addPay(pays, '玉山信用卡', true).pays.at(-1).card, true);
+  assert.equal(C.isCardPay('未知刷卡', { pays: [] }), true);
+  assert.equal(C.isCardPay('未知的卡', { pays: [] }), false);
+  assert.equal(C.isCardPay('現金', C.DEFAULT_LISTS), false);
+});
+
+test('sanitizeLists：缺的項目用預設值補上，固定項目一定保留', () => {
+  const l = C.sanitizeLists({ categories: ['餐飲'] });
+  assert.ok(l.categories.includes('繳卡費'));
+  assert.ok(l.categories.includes('朋友聚會'));
+  assert.deepEqual(l.pays, C.DEFAULT_LISTS.pays);
+  assert.deepEqual(C.sanitizeLists(null), C.DEFAULT_LISTS);
+});
+
+test('自訂清單會用在記帳，而且清單外的舊名稱仍會統計', () => {
+  const lists = C.sanitizeLists({
+    categories: ['寵物', '朋友聚會', '繳卡費'],
+    pays: [{ name: '現金', card: false }, { name: '玉山信用卡', card: true }],
+  });
+  const ok = C.buildExpense({ date: '2026-10-01', amount: 200, category: '寵物', pay: '玉山信用卡' }, 1, lists);
+  assert.equal(ok.expense.category, '寵物');
+  assert.equal(ok.expense.pay, '玉山信用卡');
+  const fallback = C.buildExpense({ date: '2026-10-01', amount: 200, category: '舊類別', pay: '國泰刷卡' }, 2, lists);
+  assert.equal(fallback.expense.category, '寵物');
+  assert.equal(fallback.expense.pay, '現金');
+  const old = [{ id: 3, date: '2026-10-02', amount: 50, category: '已刪除的類別', pay: '現金' }];
+  assert.ok(C.monthSummary(old, '2026-10', lists).categories.some(([c]) => c === '已刪除的類別'));
+});
+
+test('當月實際結餘：收入減現金支出與繳卡費，刷卡消費要等繳卡費時才算', () => {
+  const expenses = [
+    { id: 1, date: '2026-10-02', amount: 1000, category: '餐飲', pay: '現金' },
+    { id: 2, date: '2026-10-03', amount: 2000, category: '購物', pay: '國泰刷卡' },
+    { id: 3, date: '2026-10-05', amount: 5000, category: '繳卡費', pay: '轉帳' },
+    { id: 4, date: '2026-10-06', amount: 30000, category: '薪資', type: 'income', account: '銀行帳戶' },
+  ];
+  const m = C.monthSummary(expenses, '2026-10');
+  assert.equal(m.income, 30000);
+  assert.equal(m.creditOut, 2000);
+  assert.equal(m.cashOut, 6000);
+  assert.equal(m.balance, 24000);
+  // 刷卡消費還沒繳卡費時，不會減少實際結餘
+  const beforePayment = C.monthSummary(expenses.filter(e => e.id !== 3), '2026-10');
+  assert.equal(beforePayment.balance, 29000);
 });

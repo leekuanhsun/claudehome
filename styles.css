@@ -285,3 +285,12 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .color-choices{display:flex;gap:10px;flex-wrap:wrap}
 .color-choices button{width:40px;height:40px;border-radius:10px;border:3px solid transparent;cursor:pointer;padding:0}
 .color-choices button[aria-pressed=true]{border-color:var(--ink);outline:2px solid #fff;outline-offset:-5px}
+
+/* 記帳項目設定 */
+.item-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+.item-name{flex:1;min-width:0;overflow-wrap:anywhere}
+.card-flag{display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--muted);white-space:nowrap}
+.add-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 18px}
+.add-row input[type=text]{flex:1;min-width:120px}
+.sum-neg{color:var(--red)}
+

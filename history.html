@@ -40,10 +40,9 @@
   </div>
 
   <section class="grid g3">
-    <div class="card stat"><div class="label">生活費（不含聚會）</div><div class="value" id="sumLife">—</div></div>
-    <div class="card stat"><div class="label">朋友聚會</div><div class="value" id="sumOuting">—</div></div>
-    <div class="card stat"><div class="label">本月支出總計（不含繳卡費）</div><div class="value" id="sumTotal">—</div></div>
     <div class="card stat"><div class="label">本月收入</div><div class="value" id="sumIncome">—</div></div>
+    <div class="card stat"><div class="label">本月支出總計（不含繳卡費）</div><div class="value" id="sumTotal">—</div></div>
+    <div class="card stat"><div class="label">本月實際結餘</div><div class="value" id="sumBalance">—</div><p class="hint">收入減去現金、轉帳與繳卡費；刷卡消費要等繳卡費時才算付出。</p></div>
   </section>
 
   <section class="grid g2">
@@ -54,6 +53,7 @@
       <div class="row small"><span>朋友聚會</span><span id="outingText">—</span></div>
       <div class="bar"><span id="outingBar"></span></div>
       <div class="row small"><span>繳卡費（不計入總支出）</span><span id="cardPayText">—</span></div>
+      <div class="row small"><span>刷卡消費（之後繳卡費時付）</span><span id="creditText">—</span></div>
     </div>
     <div class="card">
       <h2>分類</h2>

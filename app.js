@@ -9,6 +9,7 @@
     expenses: 'savingPlan.v2.expenses',
     diary: 'savingPlan.v2.diary',
     tags: 'savingPlan.v2.tags',
+    lists: 'savingPlan.v2.lists',
     tombstones: 'savingPlan.v2.tombstones',
     meta: 'savingPlan.v2.meta',
     fx: 'savingPlan.v2.fx',
@@ -21,12 +22,14 @@
   let expenses = [];
   let diary = [];
   let customTags = {};
+  // 記帳用的類別、付款方式與收入項目（使用者可以自訂）
+  let lists = C.defaultLists();
   // 同一帳號底下的使用者：{ active: 目前使用者 id, list: [{id, name}], data: {使用者 id: 文件} }
   let acct = null;
   // 刪除記錄：{ expenses: {id: 刪除時間}, diary: {...} }，讓其他裝置同步時也會刪掉
   let tombstones = { expenses: {}, diary: {} };
   // 設定與細項最後修改的時間，用來決定同步時哪一份較新
-  let meta = { settingsU: 0, tagsU: 0 };
+  let meta = { settingsU: 0, tagsU: 0, listsU: 0 };
   let onChange = () => {};
   let onDiaryChange = () => {};
 
@@ -161,10 +164,11 @@
     const stored = readJSON([KEYS.expenses, LEGACY.expenses], []);
     expenses = Array.isArray(stored) ? stored.filter(C.isValidExpense) : [];
     customTags = C.sanitizeCustomTags(readJSON([KEYS.tags], {}));
+    lists = C.sanitizeLists(readJSON([KEYS.lists], null));
     const storedDiary = readJSON([KEYS.diary], []);
     diary = Array.isArray(storedDiary) ? storedDiary.filter(C.isValidDiary) : [];
     tombstones = readJSON([KEYS.tombstones], { expenses: {}, diary: {} });
-    meta = { settingsU: 0, tagsU: 0, ...readJSON([KEYS.meta], {}) };
+    meta = { settingsU: 0, tagsU: 0, listsU: 0, ...readJSON([KEYS.meta], {}) };
     fx = readJSON([KEYS.fx], null);
     acct = readJSON([KEYS.acct], null);
     if (acct && acct.active && acct.data && acct.data[acct.active]) applyDoc(acct.data[acct.active]);
@@ -176,6 +180,7 @@
     localStorage.setItem(KEYS.expenses, JSON.stringify(expenses));
     localStorage.setItem(KEYS.diary, JSON.stringify(diary));
     localStorage.setItem(KEYS.tags, JSON.stringify(customTags));
+    localStorage.setItem(KEYS.lists, JSON.stringify(lists));
     localStorage.setItem(KEYS.tombstones, JSON.stringify(tombstones));
     localStorage.setItem(KEYS.meta, JSON.stringify(meta));
     if (acct && acct.active) {
@@ -215,6 +220,7 @@
       tombstones,
       settings: { u: meta.settingsU || 0, v: settings },
       tags: { u: meta.tagsU || 0, v: customTags },
+      lists: { u: meta.listsU || 0, v: lists },
     };
   }
 
@@ -225,7 +231,12 @@
     tombstones = doc.tombstones || { expenses: {}, diary: {} };
     settings = C.sanitizeSettings(doc.settings && doc.settings.v);
     customTags = C.sanitizeCustomTags(doc.tags && doc.tags.v);
-    meta = { settingsU: (doc.settings && doc.settings.u) || 0, tagsU: (doc.tags && doc.tags.u) || 0 };
+    lists = C.sanitizeLists(doc.lists && doc.lists.v);
+    meta = {
+      settingsU: (doc.settings && doc.settings.u) || 0,
+      tagsU: (doc.tags && doc.tags.u) || 0,
+      listsU: (doc.lists && doc.lists.u) || 0,
+    };
     writeLocal();
   }
 
@@ -627,7 +638,7 @@
   }
 
   function fillCategories(sel) {
-    for (const c of C.CATEGORIES) {
+    for (const c of lists.categories) {
       const o = document.createElement('option');
       o.textContent = c;
       sel.appendChild(o);
@@ -653,7 +664,7 @@
       $('ovTodayText').textContent = `已花 ${money(day.spent)}，${day.remain < 0 ? '超支 ' + money(-day.remain) : '剩餘 ' + money(day.remain)}`;
       setBar($('ovTodayBar'), day.percent);
 
-      const m = C.monthSummary(expenses, todayMonth());
+      const m = C.monthSummary(expenses, todayMonth(), lists);
       $('ovMonthText').textContent = `生活費 ${money(m.life)} / ${money(p.dailyBudget)}`;
       setBar($('ovMonthBar'), C.percentOf(m.life, p.dailyBudget));
 
@@ -1051,8 +1062,8 @@
     const inc = k === 'income';
     $('kindExpense').setAttribute('aria-pressed', String(!inc));
     $('kindIncome').setAttribute('aria-pressed', String(inc));
-    fillSelect($('expCategory'), inc ? C.INCOME_CATEGORIES : C.CATEGORIES);
-    fillSelect($('expPay'), inc ? C.INCOME_ACCOUNTS : C.PAY_METHODS);
+    fillSelect($('expCategory'), inc ? lists.incomeCategories : lists.categories);
+    fillSelect($('expPay'), inc ? lists.incomeAccounts : lists.pays.map(p => p.name));
     $('payLabel').textContent = inc ? '存入帳戶' : '付款方式';
     $('mealField').hidden = inc;
     $('photoField').hidden = inc;
@@ -1067,12 +1078,6 @@
   }
 
   function initExpense() {
-    fillCategories($('expCategory'));
-    for (const p of C.PAY_METHODS) {
-      const o = document.createElement('option');
-      o.textContent = p;
-      $('expPay').appendChild(o);
-    }
     for (const c of C.CURRENCIES) {
       const o = document.createElement('option');
       o.value = c;
@@ -1155,7 +1160,7 @@
             category: $('expCategory').value,
             account: $('expPay').value,
             note: $('expNote').value,
-          }, newId())
+          }, newId(), lists)
           : C.buildExpense({
             date: $('expDate').value,
             amount: $('expAmount').value,
@@ -1167,7 +1172,7 @@
             meals: checkedMeals(),
             photos: pendingPhotos,
             location: $('expLocation').checked ? await getLocation() : null,
-          }, newId());
+          }, newId(), lists);
         if (!res.ok) {
           toast(res.message);
           $(res.field === 'date' ? 'expDate' : 'expAmount').focus();
@@ -1201,13 +1206,14 @@
     const render = () => {
       const p = C.plan(settings, todayMonth());
       const cap = p.dailyBudget;
-      const m = C.monthSummary(expenses, selectedMonth());
+      const m = C.monthSummary(expenses, selectedMonth(), lists);
 
-      $('sumLife').textContent = money(m.life);
-      $('sumOuting').textContent = money(m.outing);
       $('sumTotal').textContent = money(m.total);
       $('sumIncome').textContent = money(m.income);
+      $('sumBalance').textContent = money(m.balance);
+      $('sumBalance').classList.toggle('sum-neg', m.balance < 0);
       $('cardPayText').textContent = money(m.cardPay);
+      $('creditText').textContent = money(m.creditOut);
 
       $('lifeText').textContent = `${money(m.life)} / ${money(cap)}`;
       const lifePct = C.percentOf(m.life, cap);
@@ -1236,7 +1242,7 @@
 
     $('exportBtn').onclick = () => {
       const m = selectedMonth();
-      const list = C.monthSummary(expenses, m).list
+      const list = C.monthSummary(expenses, m, lists).list
         .slice()
         .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
       const url = URL.createObjectURL(new Blob([C.toCsv(list)], { type: 'text/csv;charset=utf-8' }));
@@ -1318,12 +1324,151 @@
 
   /* ---------- 設定 ---------- */
 
+  /* ---------- 記帳項目設定（類別、付款方式、收入類別與帳戶） ---------- */
+
+  const LIST_SECTIONS = [
+    { key: 'categories', title: '支出類別', field: 'category', income: false, pinned: C.PINNED_CATEGORIES },
+    { key: 'pays', title: '付款方式', field: 'pay', income: false, pinned: [], card: true },
+    { key: 'incomeCategories', title: '收入類別', field: 'category', income: true, pinned: [] },
+    { key: 'incomeAccounts', title: '收入帳戶', field: 'account', income: true, pinned: [] },
+  ];
+
+  function namesOf(key) {
+    return key === 'pays' ? lists.pays.map(p => p.name) : lists[key];
+  }
+
+  // 改名要同步改已經記錄的紀錄，否則舊紀錄會跟新名稱對不上
+  function renameRecords(sec, oldName, newName) {
+    const at = Date.now();
+    expenses = expenses.map(e => (C.isIncome(e) === sec.income && e[sec.field] === oldName
+      ? { ...e, [sec.field]: newName, u: at }
+      : e));
+    if (sec.key === 'categories' && customTags[oldName]) {
+      const next = { ...customTags, [newName]: customTags[oldName] };
+      delete next[oldName];
+      customTags = next;
+      meta = { ...meta, tagsU: at };
+    }
+  }
+
+  // 寫入新的清單；若存檔失敗就還原，包括要一起改的紀錄
+  function saveListEdit(nextLists, cascade) {
+    const prev = { lists, expenses, customTags, meta };
+    lists = nextLists;
+    meta = { ...meta, listsU: Date.now() };
+    if (cascade) cascade();
+    if (!save()) {
+      ({ lists, expenses, customTags, meta } = prev);
+      return false;
+    }
+    renderListsEditor();
+    return true;
+  }
+
+  function renderListsEditor() {
+    for (const sec of LIST_SECTIONS) {
+      const box = $('list-' + sec.key);
+      box.textContent = '';
+      for (const name of namesOf(sec.key)) {
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        const label = document.createElement('span');
+        label.className = 'item-name';
+        label.textContent = name;
+        row.appendChild(label);
+        if (sec.pinned.includes(name)) {
+          const pin = document.createElement('span');
+          pin.className = 'muted';
+          pin.textContent = '固定';
+          row.appendChild(pin);
+        } else {
+          const rename = document.createElement('button');
+          rename.type = 'button';
+          rename.className = 'link-btn';
+          rename.textContent = '改名';
+          rename.onclick = () => renameItem(sec, name);
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'link-btn';
+          remove.textContent = '刪除';
+          remove.onclick = () => removeItem(sec, name);
+          row.append(rename, remove);
+        }
+        if (sec.card) {
+          const card = document.createElement('label');
+          card.className = 'card-flag';
+          const box2 = document.createElement('input');
+          box2.type = 'checkbox';
+          box2.checked = C.isCardPay(name, lists);
+          box2.onchange = () => saveListEdit({ ...lists, pays: C.setPayCard(lists.pays, name, box2.checked) });
+          card.append(box2, document.createTextNode(' 刷卡'));
+          row.appendChild(card);
+        }
+        box.appendChild(row);
+      }
+    }
+  }
+
+  function renameItem(sec, oldName) {
+    const raw = window.prompt(`把「${oldName}」改成：`, oldName);
+    if (raw === null) return;
+    const newName = raw.trim();
+    const r = sec.key === 'pays'
+      ? C.renamePay(lists.pays, oldName, newName)
+      : C.renameName(lists[sec.key], oldName, newName, sec.pinned);
+    if (!r.ok) {
+      toast(r.message);
+      return;
+    }
+    const next = sec.key === 'pays' ? { ...lists, pays: r.pays } : { ...lists, [sec.key]: r.names };
+    if (saveListEdit(next, () => renameRecords(sec, oldName, newName))) toast(`已改名為「${newName}」`);
+  }
+
+  function removeItem(sec, name) {
+    if (!confirm(`刪除「${name}」？已記錄的紀錄會保留這個名稱。`)) return;
+    const r = sec.key === 'pays'
+      ? C.removePay(lists.pays, name)
+      : C.removeName(lists[sec.key], name, sec.pinned);
+    if (!r.ok) {
+      toast(r.message);
+      return;
+    }
+    const next = sec.key === 'pays' ? { ...lists, pays: r.pays } : { ...lists, [sec.key]: r.names };
+    saveListEdit(next);
+  }
+
+  function initListsEditor() {
+    for (const sec of LIST_SECTIONS) {
+      $('add-' + sec.key).addEventListener('submit', ev => {
+        ev.preventDefault();
+        const input = $('in-' + sec.key);
+        const r = sec.key === 'pays'
+          ? C.addPay(lists.pays, input.value, $('card-pays').checked)
+          : C.addName(lists[sec.key], input.value);
+        if (!r.ok) {
+          toast(r.message);
+          return;
+        }
+        const next = sec.key === 'pays' ? { ...lists, pays: r.pays } : { ...lists, [sec.key]: r.names };
+        if (saveListEdit(next)) {
+          input.value = '';
+          if (sec.key === 'pays') $('card-pays').checked = false;
+        }
+      });
+    }
+    renderListsEditor();
+  }
+
   function initSettings() {
     const fill = () => {
       for (const k of Object.keys(C.DEFAULTS)) $(k).value = settings[k];
     };
     fill();
-    onChange = fill;
+    onChange = () => {
+      fill();
+      renderListsEditor();
+    };
+    initListsEditor();
     initCloudPanel();
 
     $('setReset').onclick = () => {
