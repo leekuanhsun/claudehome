@@ -28,6 +28,13 @@
     }
   }
 
+  function signUpMessage(message) {
+    if (/already registered/i.test(message)) return '這個電子郵件已經註冊過了，請直接登入';
+    if (/signups? not allowed/i.test(message)) return '目前不開放註冊，請聯絡管理者';
+    if (/password/i.test(message)) return '密碼不符合要求，請至少輸入 6 個字';
+    return message;
+  }
+
   window.SavingPlanCloud = {
     get configured() {
       return configured;
@@ -41,6 +48,18 @@
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message === 'Invalid login credentials' ? '電子郵件或密碼錯誤' : error.message);
       localStorage.setItem(KEY_ACCOUNT, JSON.stringify({ username: data.user.email, id: data.user.id }));
+    },
+    // 註冊：若 Supabase 開啟自動確認，會直接登入；否則需要點信件中的確認連結
+    async signUp(email, password) {
+      const sb = getClient();
+      if (!sb) throw new Error('尚未設定雲端同步');
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) throw new Error(signUpMessage(error.message));
+      if (data.session) {
+        localStorage.setItem(KEY_ACCOUNT, JSON.stringify({ username: data.user.email, id: data.user.id }));
+        return 'signed-in';
+      }
+      return 'confirm-email';
     },
     async signOut() {
       const sb = getClient();

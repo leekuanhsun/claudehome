@@ -23,13 +23,26 @@
     <p>登入後才能看到記帳資料，手機與電腦會同步。</p>
   </div>
 
-  <section class="card">
+  <section class="card" id="loginCard">
     <p class="muted" id="syncStatus"></p>
     <form id="loginForm" class="cloud-form" novalidate>
       <div class="field"><label for="loginUser">電子郵件</label><input id="loginUser" type="email" autocomplete="username"></div>
       <div class="field"><label for="loginPass">密碼</label><input id="loginPass" type="password" autocomplete="current-password"></div>
       <button class="btn" type="submit">登入</button>
     </form>
+    <p class="center"><button class="link-btn" id="showSignup" type="button">沒有帳號？註冊新帳號</button></p>
+  </section>
+
+  <section class="card" id="signupCard" hidden>
+    <h2>註冊新帳號</h2>
+    <p class="muted">註冊後會看到自己的空白記帳資料，和其他人的資料分開。</p>
+    <form id="signupForm" class="cloud-form" novalidate>
+      <div class="field"><label for="signupUser">電子郵件</label><input id="signupUser" type="email" autocomplete="username"></div>
+      <div class="field"><label for="signupPass">密碼（至少 6 個字）</label><input id="signupPass" type="password" autocomplete="new-password"></div>
+      <div class="field"><label for="signupPass2">再輸入一次密碼</label><input id="signupPass2" type="password" autocomplete="new-password"></div>
+      <button class="btn" type="submit">註冊</button>
+    </form>
+    <p class="center"><button class="link-btn" id="backToLogin" type="button">已有帳號？回到登入</button></p>
   </section>
 </main>
 
