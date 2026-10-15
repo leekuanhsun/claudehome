@@ -303,7 +303,13 @@
     scheduleSync();
   }
 
+  let profilesSig = null;
+
+  // 只有使用者列表真的改變才重畫，避免同步完成時把正在點的「+」換掉
   function renderProfiles() {
+    const sig = JSON.stringify((acct && acct.list) || []);
+    if (sig === profilesSig) return;
+    profilesSig = sig;
     const grid = $('profileGrid');
     grid.textContent = '';
     (acct && acct.list || []).forEach((p, i) => {

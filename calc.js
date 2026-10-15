@@ -7,13 +7,13 @@
   'use strict';
 
   const DEFAULTS = {
-    income: 30000,
-    loan: 15500,
-    workdays: 22,
-    dailyLimit: 300,
-    outing: 2000,
-    cardPay: 5000,
-    cardBalance: 30000,
+    income: 0,
+    loan: 0,
+    workdays: 0,
+    dailyLimit: 0,
+    outing: 0,
+    cardPay: 0,
+    cardBalance: 0,
   };
 
   const LIMITS = {
