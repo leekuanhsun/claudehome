@@ -4,7 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../calc.js');
 
-const base = { ...C.DEFAULTS };
+// 測試用的範例數字（預設值已全部歸零，由使用者自行輸入）
+const example = { income: 30000, loan: 15500, workdays: 22, dailyLimit: 300, outing: 2000, cardPay: 5000, cardBalance: 30000 };
+const base = { ...example };
 
 test('plan：預設值的計算結果', () => {
   // 工作日生活費 22*300=6600；剩餘 30000-15500-6600-2000-5000=900
