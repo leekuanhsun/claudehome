@@ -372,98 +372,21 @@
     for (const k of [...Object.values(KEYS), ...Object.values(LEGACY)]) localStorage.removeItem(k);
   }
 
-  /* ---------- 登入頁：選擇使用者（像 Netflix 的「誰在用？」） ---------- */
+  /* ---------- 登入頁 ---------- */
 
-  const PROFILE_KEY = 'savingPlan.v2.profiles';
   const PROFILE_COLORS = ['#6f5fd0', '#16805a', '#b23a52', '#2d6fb0', '#c07a1a', '#7a5a9e'];
 
-  // 這台裝置上登入過的帳號（只存電子郵件，不存密碼）
-  function loadProfiles() {
-    try {
-      const list = JSON.parse(localStorage.getItem(PROFILE_KEY) || '[]');
-      return Array.isArray(list) ? list : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveProfiles(list) {
-    try {
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(list));
-    } catch {
-      // 無法寫入時只是不記住這個帳號
-    }
-  }
-
-  function rememberProfile(email) {
-    const list = loadProfiles().filter(p => p.email !== email);
-    list.unshift({ email, name: email.split('@')[0] });
-    saveProfiles(list.slice(0, 8));
-  }
-
-  function profileColor(email) {
-    const sum = [...email].reduce((n, c) => n + c.charCodeAt(0), 0);
-    return PROFILE_COLORS[sum % PROFILE_COLORS.length];
-  }
-
-  function showPicker() {
-    $('loginCard').hidden = true;
-    $('signupCard').hidden = true;
-    $('pickerCard').hidden = false;
-    const grid = $('profileGrid');
-    grid.textContent = '';
-    for (const p of loadProfiles()) {
-      const item = document.createElement('div');
-      item.className = 'profile';
-      const avatar = document.createElement('button');
-      avatar.type = 'button';
-      avatar.className = 'avatar';
-      avatar.style.background = profileColor(p.email);
-      avatar.textContent = p.name.charAt(0).toUpperCase();
-      avatar.setAttribute('aria-label', `登入 ${p.email}`);
-      avatar.onclick = () => showLoginForm(p.email);
-      const name = document.createElement('span');
-      name.className = 'profile-name';
-      name.textContent = p.name;
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'link-btn';
-      remove.textContent = '從這台移除';
-      remove.onclick = () => {
-        saveProfiles(loadProfiles().filter(x => x.email !== p.email));
-        showPicker();
-      };
-      item.append(avatar, name, remove);
-      grid.appendChild(item);
-    }
-    const add = document.createElement('div');
-    add.className = 'profile';
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'avatar add';
-    addBtn.textContent = '+';
-    addBtn.setAttribute('aria-label', '新增使用者');
-    addBtn.onclick = () => showLoginForm('');
-    const addName = document.createElement('span');
-    addName.className = 'profile-name';
-    addName.textContent = '新增使用者';
-    add.append(addBtn, addName);
-    grid.appendChild(add);
-  }
-
   function showLoginForm(email) {
-    $('pickerCard').hidden = true;
     $('signupCard').hidden = true;
     $('loginCard').hidden = false;
     $('loginUser').value = email;
     $('loginPass').value = '';
-    $('backToPicker').hidden = loadProfiles().length === 0;
     (email ? $('loginPass') : $('loginUser')).focus();
   }
 
+
   function initLogin() {
     if (!cloudReady()) {
-      $('pickerCard').hidden = true;
       setSyncStatus('尚未設定雲端同步：請在 supabase-config.js 填入 Supabase 的網址。');
       return;
     }
@@ -471,10 +394,8 @@
       location.replace('index.html');
       return;
     }
-    if (loadProfiles().length) showPicker();
-    else showLoginForm('');
+    showLoginForm('');
 
-    $('backToPicker').onclick = showPicker;
     $('loginForm').addEventListener('submit', async ev => {
       ev.preventDefault();
       const email = $('loginUser').value.trim();
@@ -485,7 +406,6 @@
       }
       try {
         await SavingPlanCloud.signIn(email, password);
-        rememberProfile(email);
         location.replace('profiles.html');
       } catch (e) {
         toast(e.message);
@@ -516,7 +436,6 @@
       try {
         const result = await SavingPlanCloud.signUp(email, password);
         if (result === 'signed-in') {
-          rememberProfile(email);
           location.replace('profiles.html');
         } else {
           toast('註冊成功，請到信箱點擊確認連結後登入');
