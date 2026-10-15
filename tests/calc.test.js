@@ -435,3 +435,33 @@ test('toCsv：有幣別時附上原幣金額', () => {
   ]);
   assert.ok(csv.includes('"328","USD","10.5"'));
 });
+
+/* ---------- 同一帳號下的多位使用者 ---------- */
+
+test('normalizeAccount：舊格式會變成 p1「我」', () => {
+  const a = C.normalizeAccount({ ...C.emptyDoc(), expenses: [{ id: 1, u: 1 }] });
+  assert.deepEqual(a.list, [{ id: 'p1', name: '我' }]);
+  assert.equal(a.profiles.p1.expenses.length, 1);
+});
+
+test('mergeAccountDocs：兩台裝置各自的使用者會合併，各使用者的資料互不影響', () => {
+  const local = { list: [{ id: 'a', name: '爸爸' }], profiles: { a: { ...C.emptyDoc(), expenses: [{ id: 1, u: 10, amount: 1 }] } } };
+  const remote = {
+    list: [{ id: 'a', name: '爸爸' }, { id: 'b', name: '媽媽' }],
+    profiles: { a: C.emptyDoc(), b: { ...C.emptyDoc(), expenses: [{ id: 2, u: 20, amount: 2 }] } },
+  };
+  const m = C.mergeAccountDocs(local, remote);
+  assert.deepEqual(m.list.map(p => p.id).sort(), ['a', 'b']);
+  assert.deepEqual(m.profiles.a.expenses.map(e => e.id), [1]);
+  assert.deepEqual(m.profiles.b.expenses.map(e => e.id), [2]);
+});
+
+test('mergeAccountDocs：可以合併舊格式的雲端資料', () => {
+  const m = C.mergeAccountDocs({ list: [], profiles: {} }, { ...C.emptyDoc(), expenses: [{ id: 3, u: 1 }] });
+  assert.deepEqual(m.list, [{ id: 'p1', name: '我' }]);
+  assert.deepEqual(m.profiles.p1.expenses.map(e => e.id), [3]);
+});
+
+test('mergeAccountDocs：沒有資料時回傳空的帳號', () => {
+  assert.deepEqual(C.mergeAccountDocs(null, null), { list: [], profiles: {} });
+});

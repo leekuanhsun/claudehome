@@ -78,7 +78,7 @@
       const { data: row, error: readError } = await sb.from(TABLE)
         .select('data').eq('user_id', account.id).maybeSingle();
       if (readError) throw readError;
-      const merged = window.SavingPlanCalc.mergeDocs(doc, row ? row.data : window.SavingPlanCalc.emptyDoc());
+      const merged = window.SavingPlanCalc.mergeAccountDocs(doc, row ? row.data : null);
       const { error: writeError } = await sb.from(TABLE)
         .upsert({ user_id: account.id, data: merged, updated_at: new Date().toISOString() });
       if (writeError) throw writeError;

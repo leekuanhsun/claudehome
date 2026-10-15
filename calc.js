@@ -392,8 +392,36 @@
     return !fx || !fx.fetchedAt || now - fx.fetchedAt > FX_MAX_AGE_MS;
   }
 
+  /* ---------- 同一帳號下的多位使用者 ---------- */
+
+  // 帳號文件：{ list: [{id, name}], profiles: {使用者 id: 文件} }
+  // 舊版是整份文件只有一位使用者，會視為 id 為 p1、名字為「我」的使用者
+  function normalizeAccount(doc) {
+    if (doc && doc.profiles && typeof doc.profiles === 'object') {
+      return { list: Array.isArray(doc.list) ? doc.list : [], profiles: doc.profiles };
+    }
+    if (doc && typeof doc === 'object' && (doc.expenses || doc.diary || doc.settings)) {
+      return { list: [{ id: 'p1', name: '我' }], profiles: { p1: doc } };
+    }
+    return { list: [], profiles: {} };
+  }
+
+  function mergeAccountDocs(local, remote) {
+    const a = normalizeAccount(local);
+    const b = normalizeAccount(remote);
+    const byId = new Map();
+    for (const item of [...a.list, ...b.list]) byId.set(item.id, item);
+    const profiles = {};
+    for (const id of new Set([...Object.keys(a.profiles), ...Object.keys(b.profiles)])) {
+      profiles[id] = mergeDocs(a.profiles[id] || emptyDoc(), b.profiles[id] || emptyDoc());
+    }
+    return { list: [...byId.values()], profiles };
+  }
+
   return {
     DEFAULTS,
+    normalizeAccount,
+    mergeAccountDocs,
     CURRENCIES,
     CURRENCY_LABELS,
     parseFx,
