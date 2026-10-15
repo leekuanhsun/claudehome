@@ -54,6 +54,37 @@
     </div>
   </form>
 
+  <section class="card" id="listsBox">
+    <h2>記帳項目</h2>
+    <p class="muted">可以自行新增、改名或刪除。改名會套用到之前的紀錄。標示「固定」的項目是系統計算要用的，不能改名或刪除。</p>
+    <h3>支出類別</h3>
+    <div id="list-categories"></div>
+    <form class="add-row" id="add-categories">
+      <input id="in-categories" type="text" maxlength="10" placeholder="新增支出類別" autocomplete="off">
+      <button class="btn ghost" type="submit">新增</button>
+    </form>
+    <h3>付款方式</h3>
+    <div id="list-pays"></div>
+    <form class="add-row" id="add-pays">
+      <input id="in-pays" type="text" maxlength="10" placeholder="新增付款方式" autocomplete="off">
+      <label class="card-flag"><input id="card-pays" type="checkbox"> 刷卡</label>
+      <button class="btn ghost" type="submit">新增</button>
+    </form>
+    <p class="hint">刷卡的消費要等到「繳卡費」時才算付出現金，所以勾選「刷卡」。</p>
+    <h3>收入類別</h3>
+    <div id="list-incomeCategories"></div>
+    <form class="add-row" id="add-incomeCategories">
+      <input id="in-incomeCategories" type="text" maxlength="10" placeholder="新增收入類別" autocomplete="off">
+      <button class="btn ghost" type="submit">新增</button>
+    </form>
+    <h3>收入帳戶</h3>
+    <div id="list-incomeAccounts"></div>
+    <form class="add-row" id="add-incomeAccounts">
+      <input id="in-incomeAccounts" type="text" maxlength="10" placeholder="新增收入帳戶" autocomplete="off">
+      <button class="btn ghost" type="submit">新增</button>
+    </form>
+  </section>
+
   <section class="card" id="cloudBox">
     <h2>雲端同步</h2>
     <p class="muted" id="syncStatus">檢查中…</p>

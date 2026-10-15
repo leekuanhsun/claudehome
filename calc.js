@@ -36,11 +36,26 @@
     cardBalance: '信用卡分期剩餘本金（約）',
   };
 
-  const CATEGORIES = ['餐飲', '交通', '飲料／點心', '購物', '朋友聚會', '生活用品', '繳卡費', '其他'];
   // 繳卡費是還信用卡帳單的轉帳，已在刷卡時記過消費，所以不計入生活費與總支出
   const CARD_PAYMENT = '繳卡費';
-  const INCOME_CATEGORIES = ['薪資', '股票', '利息', '交易', '其他'];
-  const INCOME_ACCOUNTS = ['銀行帳戶', '現金'];
+  // 系統計算要用到的項目，不能改名或刪除
+  const PINNED_CATEGORIES = ['朋友聚會', CARD_PAYMENT];
+  const LIST_MAX_NAME = 10;
+  const LIST_MAX_ITEMS = 30;
+  // 使用者可以自行新增、改名、刪除；這裡是預設值
+  const DEFAULT_LISTS = {
+    categories: ['餐飲', '交通', '飲料／點心', '購物', '朋友聚會', '生活用品', '繳卡費', '其他'],
+    // card: true 表示刷卡，要等到「繳卡費」時才真正付出現金
+    pays: [
+      { name: '現金', card: false },
+      { name: '轉帳', card: false },
+      { name: '國泰刷卡', card: true },
+      { name: '中信刷卡', card: true },
+      { name: '富邦刷卡', card: true },
+    ],
+    incomeCategories: ['薪資', '股票', '利息', '交易', '其他'],
+    incomeAccounts: ['銀行帳戶', '現金'],
+  };
   // 各類別預設的細項（餐飲的細項就是餐別）
   const PRESET_TAGS = {
     餐飲: ['早餐', '午餐', '晚餐', '下午茶'],
@@ -153,6 +168,110 @@
     };
   }
 
+  /* ---------- 自訂類別與付款方式 ---------- */
+
+  function defaultLists() {
+    return JSON.parse(JSON.stringify(DEFAULT_LISTS));
+  }
+
+  function validName(raw) {
+    const name = String(raw ?? '').trim();
+    if (!name) return { ok: false, message: '請輸入名稱' };
+    if (name.length > LIST_MAX_NAME) return { ok: false, message: `名稱最多 ${LIST_MAX_NAME} 個字` };
+    return { ok: true, name };
+  }
+
+  function sanitizeNames(arr, pinned = []) {
+    if (!Array.isArray(arr)) return null;
+    const out = [];
+    for (const x of arr) {
+      const n = typeof x === 'string' ? x.trim() : '';
+      if (!n || n.length > LIST_MAX_NAME || out.includes(n)) continue;
+      out.push(n);
+      if (out.length >= LIST_MAX_ITEMS) break;
+    }
+    for (const p of pinned) if (!out.includes(p)) out.push(p);
+    return out.length ? out : null;
+  }
+
+  function sanitizePays(arr) {
+    if (!Array.isArray(arr)) return null;
+    const out = [];
+    for (const x of arr) {
+      const name = typeof x === 'string' ? x.trim() : (x && typeof x.name === 'string' ? x.name.trim() : '');
+      if (!name || name.length > LIST_MAX_NAME || out.some(o => o.name === name)) continue;
+      const card = x && typeof x === 'object' ? !!x.card : /刷卡$/.test(name);
+      out.push({ name, card });
+      if (out.length >= LIST_MAX_ITEMS) break;
+    }
+    return out.length ? out : null;
+  }
+
+  // 讀取雲端或本機的清單；缺的部分用預設值補上，固定項目一定保留
+  function sanitizeLists(raw) {
+    const d = defaultLists();
+    if (!raw || typeof raw !== 'object') return d;
+    return {
+      categories: sanitizeNames(raw.categories, PINNED_CATEGORIES) || d.categories,
+      pays: sanitizePays(raw.pays) || d.pays,
+      incomeCategories: sanitizeNames(raw.incomeCategories) || d.incomeCategories,
+      incomeAccounts: sanitizeNames(raw.incomeAccounts) || d.incomeAccounts,
+    };
+  }
+
+  // 以下的編輯函式都只回傳新清單，不修改傳入的陣列
+  function addName(names, raw) {
+    const v = validName(raw);
+    if (!v.ok) return v;
+    if (names.includes(v.name)) return { ok: false, message: '這個名稱已經有了' };
+    if (names.length >= LIST_MAX_ITEMS) return { ok: false, message: `最多只能有 ${LIST_MAX_ITEMS} 個` };
+    return { ok: true, names: [...names, v.name] };
+  }
+
+  function renameName(names, oldName, raw, pinned = []) {
+    if (pinned.includes(oldName)) return { ok: false, message: '這個項目是固定的，不能改名' };
+    const v = validName(raw);
+    if (!v.ok) return v;
+    if (v.name !== oldName && names.includes(v.name)) return { ok: false, message: '這個名稱已經有了' };
+    return { ok: true, names: names.map(n => (n === oldName ? v.name : n)) };
+  }
+
+  function removeName(names, name, pinned = []) {
+    if (pinned.includes(name)) return { ok: false, message: '這個項目是固定的，不能刪除' };
+    if (names.length <= 1) return { ok: false, message: '至少要保留一個項目' };
+    return { ok: true, names: names.filter(n => n !== name) };
+  }
+
+  // 付款方式的「刷卡」設定只跟著名稱走，改名時保留原本的設定
+  function renamePay(pays, oldName, raw) {
+    const r = renameName(pays.map(p => p.name), oldName, raw);
+    if (!r.ok) return r;
+    return { ok: true, pays: r.names.map((name, i) => ({ name, card: pays[i].card })) };
+  }
+
+  function removePay(pays, name) {
+    const r = removeName(pays.map(p => p.name), name);
+    if (!r.ok) return r;
+    return { ok: true, pays: pays.filter(p => p.name !== name) };
+  }
+
+  function addPay(pays, raw, card) {
+    const r = addName(pays.map(p => p.name), raw);
+    if (!r.ok) return r;
+    return { ok: true, pays: [...pays, { name: r.names[r.names.length - 1], card: !!card }] };
+  }
+
+  function setPayCard(pays, name, card) {
+    return pays.map(p => (p.name === name ? { name: p.name, card: !!card } : p));
+  }
+
+  // 這個付款方式是不是刷卡（之後要繳卡費才付錢）；清單裡找不到時，依名稱判斷
+  function isCardPay(name, lists = DEFAULT_LISTS) {
+    const p = (lists.pays || []).find(x => x.name === name);
+    if (p) return !!p.card;
+    return /刷卡$/.test(String(name || ''));
+  }
+
   /* ---------- 支出紀錄 ---------- */
 
   function isValidExpense(e) {
@@ -207,12 +326,12 @@
     return { ...customTags, [category]: customs.filter(t => t !== name) };
   }
 
-  // 讀取 localStorage 的自訂細項：只保留已知類別與合法名稱
+  // 讀取 localStorage 的自訂細項：類別名稱要合法（類別可以由使用者自訂），細項名稱也要合法
   function sanitizeCustomTags(stored) {
     const out = {};
     if (!stored || typeof stored !== 'object') return out;
     for (const cat of Object.keys(stored)) {
-      if (!CATEGORIES.includes(cat) || !Array.isArray(stored[cat])) continue;
+      if (!validName(cat).ok || !Array.isArray(stored[cat])) continue;
       const names = [...new Set(stored[cat].map(t => String(t).trim()).filter(t => t && t.length <= MAX_TAG_LEN))]
         .slice(0, MAX_CUSTOM_PER_CATEGORY);
       if (names.length) out[cat] = names;
@@ -220,7 +339,7 @@
     return out;
   }
 
-  function buildExpense(input, id) {
+  function buildExpense(input, id, lists = DEFAULT_LISTS) {
     const date = String(input.date || '');
     if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
 
@@ -243,12 +362,12 @@
       }
     }
 
-    const category = CATEGORIES.includes(input.category) ? input.category : '其他';
+    const category = pickOr(lists.categories, input.category, '其他');
     const note = String(input.note || '').trim().slice(0, MAX_NOTE);
     const meals = uniqueTags(input.meals);
     const photos = (input.photos || []).filter(validPhoto).slice(0, MAX_PHOTOS);
     const location = validLocation(input.location);
-    const pay = PAY_METHODS.includes(input.pay) ? input.pay : '現金';
+    const pay = pickOr(lists.pays.map(p => p.name), input.pay, '現金');
     return {
       ok: true,
       expense: {
@@ -259,15 +378,15 @@
   }
 
   // 收入：只記金額、類別與存入的帳戶（一律是台幣）
-  function buildIncome(input, id) {
+  function buildIncome(input, id, lists = DEFAULT_LISTS) {
     const date = String(input.date || '');
     if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
     const amount = Math.round(Number(input.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) {
       return { ok: false, field: 'amount', message: '請輸入大於 0 的金額' };
     }
-    const category = INCOME_CATEGORIES.includes(input.category) ? input.category : '其他';
-    const account = INCOME_ACCOUNTS.includes(input.account) ? input.account : '銀行帳戶';
+    const category = pickOr(lists.incomeCategories, input.category, '其他');
+    const account = pickOr(lists.incomeAccounts, input.account, '銀行帳戶');
     const note = String(input.note || '').trim().slice(0, MAX_NOTE);
     return {
       ok: true,
@@ -275,12 +394,24 @@
     };
   }
 
+  // 值在清單裡就用它；否則用指定的預設值（清單裡有的話），再不行就用第一個
+  function pickOr(options, value, preferred) {
+    if (options.includes(value)) return value;
+    if (options.includes(preferred)) return preferred;
+    return options[0];
+  }
+
   // 早期的紀錄沒有 type 欄位，一律視為支出
   function isIncome(e) {
     return e.type === 'income';
   }
 
-  function monthSummary(expenses, month) {
+  // 清單之外的名稱（例如刪除前記的紀錄）也會列出來，金額才不會少算
+  function namesWithExtras(names, used) {
+    return [...names, ...[...new Set(used)].filter(x => x && !names.includes(x))];
+  }
+
+  function monthSummary(expenses, month, lists = DEFAULT_LISTS) {
     const list = expenses.filter(e => monthOf(e.date) === month);
     const spend = list.filter(e => !isIncome(e));
     const income = list.filter(isIncome);
@@ -288,22 +419,27 @@
     const cardPay = sum(spend, e => e.category === CARD_PAYMENT);
     const life = sum(spend, e => e.category !== OUTING && e.category !== CARD_PAYMENT);
     const outing = sum(spend, e => e.category === OUTING);
-    const categories = CATEGORIES
+    const categories = namesWithExtras(lists.categories, spend.map(e => e.category))
       .map(c => [c, sum(spend, e => e.category === c)])
       .filter(([, v]) => v > 0);
     // 早期沒有付款方式的紀錄歸為「未記錄」
-    const pays = PAY_METHODS
+    const payNames = namesWithExtras(lists.pays.map(p => p.name), spend.map(e => e.pay).filter(Boolean));
+    const pays = payNames
       .map(p => [p, sum(spend, e => e.pay === p)])
       .filter(([, v]) => v > 0);
     const unknown = sum(spend, e => !e.pay);
     if (unknown > 0) pays.push(['未記錄', unknown]);
     const incomeTotal = sum(income, () => true);
-    const incomeCategories = INCOME_CATEGORIES
+    const incomeCategories = namesWithExtras(lists.incomeCategories, income.map(e => e.category))
       .map(c => [c, sum(income, e => e.category === c)])
       .filter(([, v]) => v > 0);
+    // 現金流：刷卡的消費要等到繳卡費時才真的付出去，所以只算現金、轉帳與繳卡費
+    const cashOut = sum(spend, e => e.category === CARD_PAYMENT || !isCardPay(e.pay, lists));
+    const creditOut = sum(spend, e => e.category !== CARD_PAYMENT && isCardPay(e.pay, lists));
     return {
       list, life, outing, total: life + outing, cardPay, categories, pays,
       income: incomeTotal, incomeCategories,
+      cashOut, creditOut, balance: incomeTotal - cashOut,
     };
   }
 
@@ -387,6 +523,7 @@
       tombstones: { expenses: {}, diary: {} },
       settings: { u: 0, v: { ...DEFAULTS } },
       tags: { u: 0, v: {} },
+      lists: { u: 0, v: defaultLists() },
     };
   }
 
@@ -413,6 +550,7 @@
     }
     merged.settings = newerOf(a.settings, b.settings);
     merged.tags = newerOf(a.tags, b.tags);
+    merged.lists = newerOf(a.lists, b.lists);
     return merged;
   }
 
@@ -476,8 +614,6 @@
     isValidDiary,
     LIMITS,
     LABELS,
-    CATEGORIES,
-    PAY_METHODS,
     PRESET_TAGS,
     MAX_TAG_LEN,
     tagsFor,
@@ -503,8 +639,18 @@
     buildIncome,
     isIncome,
     CARD_PAYMENT,
-    INCOME_CATEGORIES,
-    INCOME_ACCOUNTS,
+    PINNED_CATEGORIES,
+    DEFAULT_LISTS,
+    defaultLists,
+    sanitizeLists,
+    addName,
+    renameName,
+    removeName,
+    addPay,
+    renamePay,
+    removePay,
+    setPayCard,
+    isCardPay,
     monthSummary,
     daySummary,
     toCsv,
