@@ -573,3 +573,12 @@ test('當月實際結餘：收入減現金支出與繳卡費，刷卡消費要�
   const beforePayment = C.monthSummary(expenses.filter(e => e.id !== 3), '2026-10');
   assert.equal(beforePayment.balance, 29000);
 });
+
+test('帳號的使用者清單：名字或頭像較新的一份獲勝，不會被雲端舊資料蓋回去', () => {
+  const local = { list: [{ id: 'p1', name: '爸爸', u: 200 }], profiles: {} };
+  const remote = { list: [{ id: 'p1', name: '我', u: 0 }], profiles: {} };
+  assert.equal(C.mergeAccountDocs(local, remote).list[0].name, '爸爸');
+  assert.equal(C.mergeAccountDocs(remote, local).list[0].name, '爸爸');
+  const older = { list: [{ id: 'p1', name: '舊', u: 100 }], profiles: {} };
+  assert.equal(C.mergeAccountDocs(local, older).list[0].name, '爸爸');
+});

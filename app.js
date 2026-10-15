@@ -324,7 +324,7 @@
   function createProfile(name) {
     ensureAcct();
     const id = 'p' + Date.now().toString(36);
-    acct.list = [...(acct.list || []), { id, name }];
+    acct.list = [...(acct.list || []), { id, name, u: Date.now() }];
     acct.data = { ...(acct.data || {}), [id]: C.emptyDoc() };
     switchProfile(id);
     scheduleSync();
@@ -459,6 +459,8 @@
       p.color = draft.color;
       if (draft.photo) p.photo = draft.photo;
       else delete p.photo;
+      // 修改時間用來在同步時決定哪一份較新
+      p.u = Date.now();
       writeLocal();
       scheduleSync();
       closeEditor();
