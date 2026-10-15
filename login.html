@@ -18,12 +18,16 @@
 </header>
 
 <main class="page narrow">
-  <div class="page-head">
-    <h1>登入</h1>
-    <p>登入後才能看到記帳資料，手機與電腦會同步。</p>
-  </div>
+  <section class="card picker" id="pickerCard" hidden>
+    <h1>誰在用？</h1>
+    <div class="profiles" id="profileGrid"></div>
+  </section>
 
   <section class="card" id="loginCard">
+    <div class="row">
+      <h2>登入</h2>
+      <button class="link-btn" id="backToPicker" type="button" hidden>← 返回選擇</button>
+    </div>
     <p class="muted" id="syncStatus"></p>
     <form id="loginForm" class="cloud-form" novalidate>
       <div class="field"><label for="loginUser">電子郵件</label><input id="loginUser" type="email" autocomplete="username"></div>
