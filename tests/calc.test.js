@@ -155,7 +155,7 @@ test('toCsv：加上 BOM、跳脫引號、防止試算表公式注入', () => {
   ]);
   assert.equal(csv.charCodeAt(0), 0xfeff);
   assert.ok(csv.includes('"\'=HYPERLINK(""x"")"'));
-  assert.ok(csv.startsWith('﻿"日期","類別","餐別／細項","付款方式","備註","金額（台幣）","幣別","原幣金額"'));
+  assert.ok(csv.startsWith('﻿"日期","類別","餐別／細項","付款方式","備註","金額（台幣）","幣別","原幣金額","收支"'));
 });
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
@@ -466,4 +466,45 @@ test('mergeAccountDocs：可以合併舊格式的雲端資料', () => {
 
 test('mergeAccountDocs：沒有資料時回傳空的帳號', () => {
   assert.deepEqual(C.mergeAccountDocs(null, null), { list: [], profiles: {} });
+});
+
+test('繳卡費與收入不計入生活費與總支出，收入另外統計', () => {
+  const expenses = [
+    { id: 1, date: '2026-10-02', amount: 100, category: '餐飲', pay: '現金' },
+    { id: 2, date: '2026-10-03', amount: 5000, category: '繳卡費', pay: '轉帳' },
+    { id: 3, date: '2026-10-04', amount: 300, category: '朋友聚會', pay: '國泰刷卡' },
+    { id: 4, date: '2026-10-05', amount: 30000, category: '薪資', type: 'income', account: '銀行帳戶' },
+    { id: 5, date: '2026-10-06', amount: 500, category: '利息', type: 'income', account: '現金' },
+  ];
+  const m = C.monthSummary(expenses, '2026-10');
+  assert.equal(m.life, 100);
+  assert.equal(m.outing, 300);
+  assert.equal(m.total, 400);
+  assert.equal(m.cardPay, 5000);
+  assert.equal(m.income, 30500);
+  assert.deepEqual(m.incomeCategories, [['薪資', 30000], ['利息', 500]]);
+  assert.ok(m.pays.some(([p, v]) => p === '轉帳' && v === 5000));
+  assert.equal(C.daySummary(expenses, '2026-10-03', 300).spent, 0);
+  assert.equal(C.daySummary(expenses, '2026-10-04', 300).spent, 0);
+  assert.equal(C.daySummary(expenses, '2026-10-02', 300).spent, 100);
+});
+
+test('buildIncome 檢查金額並限制類別與帳戶', () => {
+  const ok = C.buildIncome({ date: '2026-10-01', amount: '30000', category: '薪資', account: '現金' }, 9);
+  assert.equal(ok.ok, true);
+  assert.equal(ok.expense.type, 'income');
+  assert.equal(ok.expense.amount, 30000);
+  assert.equal(ok.expense.account, '現金');
+  const fallback = C.buildIncome({ date: '2026-10-01', amount: 10, category: '亂填', account: '別的' }, 10);
+  assert.equal(fallback.expense.category, '其他');
+  assert.equal(fallback.expense.account, '銀行帳戶');
+  assert.equal(C.buildIncome({ date: '2026-10-01', amount: 0 }, 11).ok, false);
+  assert.equal(C.buildIncome({ date: 'bad', amount: 10 }, 12).ok, false);
+});
+
+test('收入的 CSV 會標示收支，並把帳戶放在付款方式欄', () => {
+  const csv = C.toCsv([{ id: 1, date: '2026-10-01', amount: 30000, category: '薪資', type: 'income', account: '銀行帳戶', note: '' }]);
+  assert.ok(csv.includes('"薪資"'));
+  assert.ok(csv.includes('"銀行帳戶"'));
+  assert.ok(csv.trimEnd().endsWith('"收入"'));
 });

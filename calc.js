@@ -36,13 +36,17 @@
     cardBalance: '信用卡分期剩餘本金（約）',
   };
 
-  const CATEGORIES = ['餐飲', '交通', '飲料／點心', '購物', '朋友聚會', '生活用品', '其他'];
+  const CATEGORIES = ['餐飲', '交通', '飲料／點心', '購物', '朋友聚會', '生活用品', '繳卡費', '其他'];
+  // 繳卡費是還信用卡帳單的轉帳，已在刷卡時記過消費，所以不計入生活費與總支出
+  const CARD_PAYMENT = '繳卡費';
+  const INCOME_CATEGORIES = ['薪資', '股票', '利息', '交易', '其他'];
+  const INCOME_ACCOUNTS = ['銀行帳戶', '現金'];
   // 各類別預設的細項（餐飲的細項就是餐別）
   const PRESET_TAGS = {
     餐飲: ['早餐', '午餐', '晚餐', '下午茶'],
     交通: ['保養', '加油', '車票'],
   };
-  const PAY_METHODS = ['現金', '國泰刷卡', '中信刷卡', '富邦刷卡'];
+  const PAY_METHODS = ['現金', '轉帳', '國泰刷卡', '中信刷卡', '富邦刷卡'];
   // 所有金額都換算成台幣（amount）儲存；TWD 是基準幣別
   const CURRENCY_LABELS = {
     TWD: '台幣 TWD',
@@ -254,26 +258,58 @@
     };
   }
 
+  // 收入：只記金額、類別與存入的帳戶（一律是台幣）
+  function buildIncome(input, id) {
+    const date = String(input.date || '');
+    if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
+    const amount = Math.round(Number(input.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) {
+      return { ok: false, field: 'amount', message: '請輸入大於 0 的金額' };
+    }
+    const category = INCOME_CATEGORIES.includes(input.category) ? input.category : '其他';
+    const account = INCOME_ACCOUNTS.includes(input.account) ? input.account : '銀行帳戶';
+    const note = String(input.note || '').trim().slice(0, MAX_NOTE);
+    return {
+      ok: true,
+      expense: { id, date, amount, type: 'income', category, account, note },
+    };
+  }
+
+  // 早期的紀錄沒有 type 欄位，一律視為支出
+  function isIncome(e) {
+    return e.type === 'income';
+  }
+
   function monthSummary(expenses, month) {
     const list = expenses.filter(e => monthOf(e.date) === month);
-    const sum = pred => list.reduce((s, e) => (pred(e) ? s + e.amount : s), 0);
-    const life = sum(e => e.category !== OUTING);
-    const outing = sum(e => e.category === OUTING);
+    const spend = list.filter(e => !isIncome(e));
+    const income = list.filter(isIncome);
+    const sum = (rows, pred) => rows.reduce((s, e) => (pred(e) ? s + e.amount : s), 0);
+    const cardPay = sum(spend, e => e.category === CARD_PAYMENT);
+    const life = sum(spend, e => e.category !== OUTING && e.category !== CARD_PAYMENT);
+    const outing = sum(spend, e => e.category === OUTING);
     const categories = CATEGORIES
-      .map(c => [c, sum(e => e.category === c)])
+      .map(c => [c, sum(spend, e => e.category === c)])
       .filter(([, v]) => v > 0);
     // 早期沒有付款方式的紀錄歸為「未記錄」
     const pays = PAY_METHODS
-      .map(p => [p, sum(e => e.pay === p)])
+      .map(p => [p, sum(spend, e => e.pay === p)])
       .filter(([, v]) => v > 0);
-    const unknown = sum(e => !e.pay);
+    const unknown = sum(spend, e => !e.pay);
     if (unknown > 0) pays.push(['未記錄', unknown]);
-    return { list, life, outing, total: life + outing, categories, pays };
+    const incomeTotal = sum(income, () => true);
+    const incomeCategories = INCOME_CATEGORIES
+      .map(c => [c, sum(income, e => e.category === c)])
+      .filter(([, v]) => v > 0);
+    return {
+      list, life, outing, total: life + outing, cardPay, categories, pays,
+      income: incomeTotal, incomeCategories,
+    };
   }
 
   function daySummary(expenses, date, dailyLimit) {
     const spent = expenses
-      .filter(e => e.date === date && e.category !== OUTING)
+      .filter(e => e.date === date && !isIncome(e) && e.category !== OUTING && e.category !== CARD_PAYMENT)
       .reduce((s, e) => s + e.amount, 0);
     return {
       spent,
@@ -291,10 +327,14 @@
 
   function toCsv(list) {
     const rows = [
-      ['日期', '類別', '餐別／細項', '付款方式', '備註', '金額（台幣）', '幣別', '原幣金額'],
+      ['日期', '類別', '餐別／細項', '付款方式', '備註', '金額（台幣）', '幣別', '原幣金額', '收支'],
       ...list.map(e => [
-        e.date, e.category, (e.meals || []).join('、'), e.pay || '', e.note, e.amount,
+        e.date, e.category,
+        isIncome(e) ? '' : (e.meals || []).join('、'),
+        isIncome(e) ? e.account : (e.pay || ''),
+        e.note, e.amount,
         e.currency || '', e.currency && e.currency !== 'TWD' ? e.origAmount : '',
+        isIncome(e) ? '收入' : '支出',
       ]),
     ];
     return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
@@ -460,6 +500,11 @@
     isValidExpense,
     validPhoto,
     buildExpense,
+    buildIncome,
+    isIncome,
+    CARD_PAYMENT,
+    INCOME_CATEGORIES,
+    INCOME_ACCOUNTS,
     monthSummary,
     daySummary,
     toCsv,

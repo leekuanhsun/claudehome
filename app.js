@@ -64,6 +64,18 @@
     const td = document.createElement('td');
     const meals = e.meals || [];
     const photos = e.photos || [];
+    if (C.isIncome(e)) {
+      const inTag = document.createElement('span');
+      inTag.className = 'income-tag';
+      inTag.textContent = '收入';
+      td.appendChild(inTag);
+      const acct = document.createElement('span');
+      acct.className = 'pay-tag';
+      acct.textContent = e.account || '';
+      td.appendChild(acct);
+      if (e.note) td.appendChild(document.createTextNode(e.note));
+      return td;
+    }
     if (!meals.length && !e.note && !photos.length && !e.location && !e.pay && !isForeign(e)) {
       td.textContent = '—';
       return td;
@@ -112,7 +124,11 @@
     for (const e of list) {
       const tr = document.createElement('tr');
       if (showDate) tr.append(cell(e.date));
-      tr.append(cell(e.category), noteCell(e), cell(money(e.amount), 'amount'));
+      tr.append(
+        cell(e.category),
+        noteCell(e),
+        C.isIncome(e) ? cell('+' + money(e.amount), 'amount income') : cell(money(e.amount), 'amount'),
+      );
       const op = document.createElement('td');
       const btn = document.createElement('button');
       btn.className = 'btn danger-sm';
@@ -1018,6 +1034,38 @@
     }
   }
 
+  // 支出／收入：收入只需要金額、類別與存入的帳戶
+  let kind = 'expense';
+
+  function fillSelect(sel, options) {
+    sel.textContent = '';
+    for (const text of options) {
+      const o = document.createElement('option');
+      o.textContent = text;
+      sel.appendChild(o);
+    }
+  }
+
+  function setKind(k) {
+    kind = k;
+    const inc = k === 'income';
+    $('kindExpense').setAttribute('aria-pressed', String(!inc));
+    $('kindIncome').setAttribute('aria-pressed', String(inc));
+    fillSelect($('expCategory'), inc ? C.INCOME_CATEGORIES : C.CATEGORIES);
+    fillSelect($('expPay'), inc ? C.INCOME_ACCOUNTS : C.PAY_METHODS);
+    $('payLabel').textContent = inc ? '存入帳戶' : '付款方式';
+    $('mealField').hidden = inc;
+    $('photoField').hidden = inc;
+    $('locationField').hidden = inc;
+    $('expCurrency').hidden = inc;
+    if (inc) {
+      $('expCurrency').value = 'TWD';
+      updateRateField();
+    }
+    $('submitBtn').textContent = inc ? '記錄收入' : '記錄支出';
+    if (!inc) renderTags(false);
+  }
+
   function initExpense() {
     fillCategories($('expCategory'));
     for (const p of C.PAY_METHODS) {
@@ -1044,7 +1092,11 @@
     };
     onFxChange();
     renderTags(false);
-    $('expCategory').addEventListener('change', () => renderTags(false));
+    $('expCategory').addEventListener('change', () => {
+      if (kind === 'expense') renderTags(false);
+    });
+    $('kindExpense').onclick = () => setKind('expense');
+    $('kindIncome').onclick = () => setKind('income');
     $('tagAdd').onclick = addCustomTag;
     $('tagInput').addEventListener('keydown', ev => {
       if (ev.key === 'Enter') {
@@ -1053,6 +1105,7 @@
       }
     });
     $('expDate').value = todayIso();
+    setKind('expense');
 
     const selectedDate = () => $('expDate').value || todayIso();
 
@@ -1095,19 +1148,26 @@
       const submitBtn = $('expForm').querySelector('button[type=submit]');
       submitBtn.disabled = true;
       try {
-        const location = $('expLocation').checked ? await getLocation() : null;
-        const res = C.buildExpense({
-          date: $('expDate').value,
-          amount: $('expAmount').value,
-          currency: $('expCurrency').value,
-          rate: $('expRate').value,
-          category: $('expCategory').value,
-          pay: $('expPay').value,
-          note: $('expNote').value,
-          meals: checkedMeals(),
-          photos: pendingPhotos,
-          location,
-        }, newId());
+        const res = kind === 'income'
+          ? C.buildIncome({
+            date: $('expDate').value,
+            amount: $('expAmount').value,
+            category: $('expCategory').value,
+            account: $('expPay').value,
+            note: $('expNote').value,
+          }, newId())
+          : C.buildExpense({
+            date: $('expDate').value,
+            amount: $('expAmount').value,
+            currency: $('expCurrency').value,
+            rate: $('expRate').value,
+            category: $('expCategory').value,
+            pay: $('expPay').value,
+            note: $('expNote').value,
+            meals: checkedMeals(),
+            photos: pendingPhotos,
+            location: $('expLocation').checked ? await getLocation() : null,
+          }, newId());
         if (!res.ok) {
           toast(res.message);
           $(res.field === 'date' ? 'expDate' : 'expAmount').focus();
@@ -1146,6 +1206,8 @@
       $('sumLife').textContent = money(m.life);
       $('sumOuting').textContent = money(m.outing);
       $('sumTotal').textContent = money(m.total);
+      $('sumIncome').textContent = money(m.income);
+      $('cardPayText').textContent = money(m.cardPay);
 
       $('lifeText').textContent = `${money(m.life)} / ${money(cap)}`;
       const lifePct = C.percentOf(m.life, cap);
@@ -1159,6 +1221,7 @@
 
       renderCategories(m.categories);
       renderCategories(m.pays, 'payBreakdown');
+      renderCategories(m.incomeCategories, 'incomeBreakdown');
 
       const list = m.list.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
       fillRows($('histRows'), list, true);
