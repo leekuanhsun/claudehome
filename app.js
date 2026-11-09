@@ -67,6 +67,15 @@
     const td = document.createElement('td');
     const meals = e.meals || [];
     const photos = e.photos || [];
+    if (e.type === 'transfer' || e.type === 'adjust') {
+      const tag = document.createElement('span');
+      tag.className = e.type === 'transfer' ? 'income-tag' : 'pay-tag';
+      tag.textContent = e.type === 'transfer' ? `${e.account} → ${e.toAccount}` : `${e.account}`;
+      td.appendChild(tag);
+      if (e.type === 'adjust') td.appendChild(document.createTextNode('更新餘額'));
+      if (e.note) td.appendChild(document.createTextNode(e.note));
+      return td;
+    }
     if (C.isIncome(e)) {
       const inTag = document.createElement('span');
       inTag.className = 'income-tag';
@@ -130,7 +139,9 @@
       tr.append(
         cell(e.category),
         noteCell(e),
-        C.isIncome(e) ? cell('+' + money(e.amount), 'amount income') : cell(money(e.amount), 'amount'),
+        C.isIncome(e) ? cell('+' + money(e.amount), 'amount income')
+          : e.type === 'adjust' ? cell((e.dir > 0 ? '+' : '-') + money(e.amount), e.dir > 0 ? 'amount income' : 'amount')
+          : cell(money(e.amount), 'amount'),
       );
       const op = document.createElement('td');
       const btn = document.createElement('button');
@@ -1062,21 +1073,145 @@
   function setKind(k) {
     kind = k;
     const inc = k === 'income';
-    $('kindExpense').setAttribute('aria-pressed', String(!inc));
+    const tr = k === 'transfer';
+    const exp = k === 'expense';
+    $('kindExpense').setAttribute('aria-pressed', String(exp));
     $('kindIncome').setAttribute('aria-pressed', String(inc));
+    $('kindTransfer').setAttribute('aria-pressed', String(tr));
+    $('expCategory').closest('.field').hidden = tr;
     fillSelect($('expCategory'), inc ? lists.incomeCategories : lists.categories);
-    fillSelect($('expPay'), inc ? lists.incomeAccounts : lists.pays.map(p => p.name));
-    $('payLabel').textContent = inc ? '存入帳戶' : '付款方式';
-    $('mealField').hidden = inc;
-    $('photoField').hidden = inc;
-    $('locationField').hidden = inc;
-    $('expCurrency').hidden = inc;
-    if (inc) {
+    fillSelect($('expPay'), inc || tr ? lists.accounts : lists.pays.map(p => p.name));
+    $('payLabel').textContent = inc ? '存入帳戶' : tr ? '轉出帳戶' : '付款方式';
+    fillSelect($('expAccount'), lists.accounts);
+    fillSelect($('expToAccount'), lists.accounts);
+    $('expToAccount').selectedIndex = lists.accounts.length > 1 ? 1 : 0;
+    $('toAccountField').hidden = !tr;
+    syncAccountField();
+    for (const id of ['mealField', 'photoField', 'locationField']) $(id).hidden = inc || tr;
+    $('expCurrency').hidden = inc || tr;
+    if (inc || tr) {
       $('expCurrency').value = 'TWD';
       updateRateField();
     }
-    $('submitBtn').textContent = inc ? '記錄收入' : '記錄支出';
-    if (!inc) renderTags(false);
+    $('submitBtn').textContent = inc ? '記錄收入' : tr ? '記錄轉帳' : '記錄支出';
+    if (exp) renderTags(false);
+  }
+
+  // 一般支出才需要扣款帳戶；刷卡要等繳卡費時才扣款，所以不需要選
+  function syncAccountField() {
+    const pay = $('expPay').value;
+    $('accountField').hidden = kind !== 'expense' || C.isCardPay(pay, lists);
+    if (lists.accounts.includes(pay)) $('expAccount').value = pay;
+  }
+
+  /* ---------- 帳戶：餘額與圓餅圖 ---------- */
+
+  const PIE_COLORS = ['#6f5fd0', '#16805a', '#2d6fb0', '#c07a1a', '#b23a52', '#7a5a9e', '#3d9a9a', '#8a8a3a'];
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function drawPie(shares) {
+    const svg = $('accPie');
+    svg.textContent = '';
+    if (!shares.length) return;
+    if (shares.length === 1) {
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('cx', '100');
+      c.setAttribute('cy', '100');
+      c.setAttribute('r', '90');
+      c.setAttribute('fill', PIE_COLORS[0]);
+      svg.appendChild(c);
+      return;
+    }
+    let angle = -Math.PI / 2;
+    shares.forEach((sh, i) => {
+      const frac = sh.percent / 100;
+      const end = angle + frac * Math.PI * 2;
+      const x1 = 100 + 90 * Math.cos(angle);
+      const y1 = 100 + 90 * Math.sin(angle);
+      const x2 = 100 + 90 * Math.cos(end);
+      const y2 = 100 + 90 * Math.sin(end);
+      const path = document.createElementNS(SVG_NS, 'path');
+      const large = frac > 0.5 ? 1 : 0;
+      path.setAttribute('d', `M100 100 L${x1} ${y1} A90 90 0 ${large} 1 ${x2} ${y2} Z`);
+      path.setAttribute('fill', PIE_COLORS[i % PIE_COLORS.length]);
+      svg.appendChild(path);
+      angle = end;
+    });
+  }
+
+  function renderAccounts() {
+    const balances = C.accountBalances(expenses, lists);
+    const total = balances.reduce((s, b) => s + b.balance, 0);
+    $('accTotal').textContent = money(total);
+    $('accTotal').classList.toggle('sum-neg', total < 0);
+
+    const shares = C.accountShares(balances);
+    const colorOf = new Map(shares.map((sh, i) => [sh.name, PIE_COLORS[i % PIE_COLORS.length]]));
+    drawPie(shares);
+    $('accPie').hidden = shares.length === 0;
+    $('accEmpty').hidden = shares.length > 0;
+
+    const legend = $('accLegend');
+    legend.textContent = '';
+    for (const sh of shares) {
+      const li = document.createElement('div');
+      li.className = 'legend-row';
+      const dot = document.createElement('span');
+      dot.className = 'legend-dot';
+      dot.style.background = colorOf.get(sh.name);
+      li.append(dot, document.createTextNode(`${sh.name}　${Math.round(sh.percent)}%`));
+      legend.appendChild(li);
+    }
+
+    const rows = $('accRows');
+    rows.textContent = '';
+    for (const b of balances) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      const dot = document.createElement('span');
+      dot.className = 'legend-dot';
+      dot.style.background = colorOf.get(b.name) || 'var(--line)';
+      const name = document.createElement('span');
+      name.className = 'item-name';
+      name.textContent = b.name;
+      const amount = document.createElement('span');
+      amount.className = 'acc-balance' + (b.balance < 0 ? ' sum-neg' : '');
+      amount.textContent = money(b.balance);
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'link-btn';
+      edit.textContent = '更新餘額';
+      edit.onclick = () => updateBalance(b.name, b.balance);
+      row.append(dot, name, amount, edit);
+      rows.appendChild(row);
+    }
+  }
+
+  // 輸入帳戶裡實際的餘額，程式會記一筆「更新餘額」的差額
+  function updateBalance(name, current) {
+    const raw = window.prompt(`「${name}」目前實際的餘額是多少？`, String(current));
+    if (raw === null) return;
+    if (!raw.trim() || !Number.isFinite(Number(raw))) {
+      toast('請輸入數字');
+      return;
+    }
+    const res = C.buildAdjust({ date: todayIso(), diff: Number(raw) - current, account: name }, newId(), lists);
+    if (!res.ok) {
+      toast(res.message);
+      return;
+    }
+    res.expense.u = Date.now();
+    expenses.push(res.expense);
+    if (!save()) {
+      expenses.pop();
+      return;
+    }
+    toast(`「${name}」已更新`);
+  }
+
+  function initAccounts() {
+    onChange = renderAccounts;
+    renderAccounts();
   }
 
   function initExpense() {
@@ -1104,6 +1239,8 @@
     });
     $('kindExpense').onclick = () => setKind('expense');
     $('kindIncome').onclick = () => setKind('income');
+    $('kindTransfer').onclick = () => setKind('transfer');
+    $('expPay').addEventListener('change', syncAccountField);
     $('tagAdd').onclick = addCustomTag;
     $('tagInput').addEventListener('keydown', ev => {
       if (ev.key === 'Enter') {
@@ -1155,7 +1292,15 @@
       const submitBtn = $('expForm').querySelector('button[type=submit]');
       submitBtn.disabled = true;
       try {
-        const res = kind === 'income'
+        const res = kind === 'transfer'
+          ? C.buildTransfer({
+            date: $('expDate').value,
+            amount: $('expAmount').value,
+            account: $('expPay').value,
+            toAccount: $('expToAccount').value,
+            note: $('expNote').value,
+          }, newId(), lists)
+          : kind === 'income'
           ? C.buildIncome({
             date: $('expDate').value,
             amount: $('expAmount').value,
@@ -1170,6 +1315,7 @@
             rate: $('expRate').value,
             category: $('expCategory').value,
             pay: $('expPay').value,
+            account: $('expAccount').value,
             note: $('expNote').value,
             meals: checkedMeals(),
             photos: pendingPhotos,
@@ -1332,7 +1478,7 @@
     { key: 'categories', title: '支出類別', field: 'category', income: false, pinned: C.PINNED_CATEGORIES },
     { key: 'pays', title: '付款方式', field: 'pay', income: false, pinned: [], card: true },
     { key: 'incomeCategories', title: '收入類別', field: 'category', income: true, pinned: [] },
-    { key: 'incomeAccounts', title: '收入帳戶', field: 'account', income: true, pinned: [] },
+    { key: 'accounts', title: '帳戶', field: 'account', income: false, pinned: [] },
   ];
 
   function namesOf(key) {
@@ -1342,6 +1488,15 @@
   // 改名要同步改已經記錄的紀錄，否則舊紀錄會跟新名稱對不上
   function renameRecords(sec, oldName, newName) {
     const at = Date.now();
+    if (sec.key === 'accounts') {
+      expenses = expenses.map(e => {
+        let next = e;
+        if (e.account === oldName) next = { ...next, account: newName, u: at };
+        if (e.toAccount === oldName) next = { ...next, toAccount: newName, u: at };
+        return next;
+      });
+      return;
+    }
     expenses = expenses.map(e => (C.isIncome(e) === sec.income && e[sec.field] === oldName
       ? { ...e, [sec.field]: newName, u: at }
       : e));
@@ -1504,6 +1659,7 @@
   const INITS = {
     overview: initOverview,
     expense: initExpense,
+    accounts: initAccounts,
     diary: initDiary,
     history: initHistory,
     plan: initPlan,

@@ -497,7 +497,7 @@ test('buildIncome 檢查金額並限制類別與帳戶', () => {
   assert.equal(ok.expense.account, '現金');
   const fallback = C.buildIncome({ date: '2026-10-01', amount: 10, category: '亂填', account: '別的' }, 10);
   assert.equal(fallback.expense.category, '其他');
-  assert.equal(fallback.expense.account, '銀行帳戶');
+  assert.equal(fallback.expense.account, '現金');
   assert.equal(C.buildIncome({ date: '2026-10-01', amount: 0 }, 11).ok, false);
   assert.equal(C.buildIncome({ date: 'bad', amount: 10 }, 12).ok, false);
 });
@@ -581,4 +581,37 @@ test('帳號的使用者清單：名字或頭像較新的一份獲勝，不會�
   assert.equal(C.mergeAccountDocs(remote, local).list[0].name, '爸爸');
   const older = { list: [{ id: 'p1', name: '舊', u: 100 }], profiles: {} };
   assert.equal(C.mergeAccountDocs(local, older).list[0].name, '爸爸');
+});
+
+test('帳戶餘額：收入加入、支出扣除、轉帳移動、刷卡等繳卡費才扣款', () => {
+  const lists = C.sanitizeLists({ accounts: ['現金', '中信', '永豐'] });
+  const expenses = [
+    { id: 1, date: '2026-10-01', type: 'adjust', account: '中信', dir: 1, amount: 10000, category: '更新餘額' },
+    { id: 2, date: '2026-10-02', type: 'income', account: '中信', amount: 30000, category: '薪資' },
+    { id: 3, date: '2026-10-03', amount: 500, category: '餐飲', pay: '現金', account: '現金' },
+    { id: 4, date: '2026-10-04', amount: 2000, category: '購物', pay: '中信刷卡', account: null },
+    { id: 5, date: '2026-10-05', type: 'transfer', account: '中信', toAccount: '永豐', amount: 5000, category: '轉帳' },
+    { id: 6, date: '2026-10-06', amount: 3000, category: '繳卡費', pay: '轉帳', account: '中信' },
+  ];
+  const b = Object.fromEntries(C.accountBalances(expenses, lists).map(x => [x.name, x.balance]));
+  assert.equal(b['中信'], 10000 + 30000 - 5000 - 3000);
+  assert.equal(b['永豐'], 5000);
+  assert.equal(b['現金'], -500);
+  assert.deepEqual(C.accountShares([{ name: 'a', balance: 300 }, { name: 'b', balance: -50 }, { name: 'c', balance: 100 }])
+    .map(x => [x.name, x.percent]), [['a', 75], ['c', 25]]);
+});
+
+test('轉帳與更新餘額：檢查金額、帳戶，且不計入收入或支出', () => {
+  const lists = C.sanitizeLists({ accounts: ['現金', '中信'] });
+  assert.equal(C.buildTransfer({ date: '2026-10-01', amount: 100, account: '中信', toAccount: '中信' }, 1, lists).ok, false);
+  const t = C.buildTransfer({ date: '2026-10-01', amount: 100, account: '中信', toAccount: '現金' }, 2, lists);
+  assert.equal(t.expense.type, 'transfer');
+  assert.equal(C.isSpend(t.expense), false);
+  const a = C.buildAdjust({ date: '2026-10-01', diff: -250, account: '現金' }, 3, lists);
+  assert.equal(a.expense.amount, 250);
+  assert.equal(a.expense.dir, -1);
+  assert.equal(C.buildAdjust({ date: '2026-10-01', diff: 0, account: '現金' }, 4, lists).ok, false);
+  const m = C.monthSummary([t.expense, a.expense], '2026-10', lists);
+  assert.equal(m.total, 0);
+  assert.equal(m.income, 0);
 });
