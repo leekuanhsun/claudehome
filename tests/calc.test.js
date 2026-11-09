@@ -615,3 +615,32 @@ test('轉帳與更新餘額：檢查金額、帳戶，且不計入收入或支�
   assert.equal(m.total, 0);
   assert.equal(m.income, 0);
 });
+
+test('工作日：只算週一到週五，並扣掉行事曆上的假日', () => {
+  // 2026-11 共 30 天；用逐日檢查當作對照
+  let expected = 0;
+  for (let d = 1; d <= 30; d++) {
+    const dow = new Date(Date.UTC(2026, 10, d)).getUTCDay();
+    if (dow !== 0 && dow !== 6) expected++;
+  }
+  assert.equal(C.workdaysIn('2026-11'), expected);
+  // 把一個平日標為假日，就少一天；把週末標為假日，不影響結果
+  const weekday = [...Array(30)].map((_, i) => `2026-11-${String(i + 1).padStart(2, '0')}`)
+    .find(iso => { const w = new Date(iso + 'T00:00:00Z').getUTCDay(); return w !== 0 && w !== 6; });
+  const weekend = [...Array(30)].map((_, i) => `2026-11-${String(i + 1).padStart(2, '0')}`)
+    .find(iso => { const w = new Date(iso + 'T00:00:00Z').getUTCDay(); return w === 0 || w === 6; });
+  assert.equal(C.workdaysIn('2026-11', new Set([weekday])), expected - 1);
+  assert.equal(C.workdaysIn('2026-11', new Set([weekend])), expected);
+});
+
+test('台灣行事曆：只取紅字（isHoliday）的日期，轉成 YYYY-MM-DD', () => {
+  const days = C.holidaysFromCalendar([
+    { date: '20260101', isHoliday: true, description: '開國紀念日' },
+    { date: '20260102', isHoliday: false, description: '' },
+    { date: '20260103', isHoliday: true, description: '' },
+    { date: 'bad', isHoliday: true },
+    null,
+  ]);
+  assert.deepEqual(days, ['2026-01-01', '2026-01-03']);
+  assert.equal(C.holidaysFromCalendar('not-an-array'), null);
+});

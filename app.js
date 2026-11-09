@@ -662,7 +662,7 @@
 
   function initOverview() {
     const render = () => {
-      const p = C.plan(settings, todayMonth());
+      const p = C.plan(planSettings(), todayMonth());
       $('ovIncome').textContent = money(settings.income);
       $('ovFixed').textContent = money(settings.loan + p.cardPay + settings.outing + p.dailyBudget);
       $('ovDaily').textContent = money(p.dailyBudget);
@@ -1352,7 +1352,7 @@
     const selectedMonth = () => $('histPicker').value || todayMonth();
 
     const render = () => {
-      const p = C.plan(settings, todayMonth());
+      const p = C.plan(planSettings(), todayMonth());
       const cap = p.dailyBudget;
       const m = C.monthSummary(expenses, selectedMonth(), lists);
 
@@ -1440,7 +1440,7 @@
 
   function initPlan() {
     const render = () => {
-      const p = C.plan(settings, todayMonth());
+      const p = C.plan(planSettings(), todayMonth());
 
       $('planStage1').textContent = money(p.buffer) + ' / 月';
       $('planStage1Note').textContent = p.cardMonths
@@ -1471,6 +1471,64 @@
   }
 
   /* ---------- 設定 ---------- */
+
+  /* ---------- 每月工作日：依台灣行事曆自動計算（只存在這台裝置） ---------- */
+
+  const HOLIDAY_KEY = 'savingPlan.v2.holidays';
+  const WORKDAY_AUTO_KEY = 'savingPlan.v2.workdaysAuto';
+  const holidayUrl = year => `https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar@master/data/${year}.json`;
+
+  function loadHolidayCache() {
+    try {
+      return JSON.parse(localStorage.getItem(HOLIDAY_KEY) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  // 某一年的假日集合；還沒抓到時回傳 null
+  function holidaySet(year) {
+    const days = loadHolidayCache()[year];
+    return Array.isArray(days) ? new Set(days) : null;
+  }
+
+  // 抓一年的行事曆並快取；離線或抓不到時回傳 false，這時先用「扣掉週六日」的算法
+  async function fetchHolidays(year) {
+    if (holidaySet(year)) return false;
+    try {
+      const res = await fetch(holidayUrl(year));
+      if (!res.ok) return false;
+      const days = C.holidaysFromCalendar(await res.json());
+      if (!days) return false;
+      const cache = loadHolidayCache();
+      cache[year] = days;
+      localStorage.setItem(HOLIDAY_KEY, JSON.stringify(cache));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // 預設開啟自動計算
+  const workdaysAuto = () => localStorage.getItem(WORKDAY_AUTO_KEY) !== '0';
+  const setWorkdaysAuto = on => localStorage.setItem(WORKDAY_AUTO_KEY, on ? '1' : '0');
+
+  function autoWorkdays(month) {
+    return C.workdaysIn(month, holidaySet(month.slice(0, 4)) || new Set());
+  }
+
+  // 規劃與總覽使用的設定：工作日若是自動，就換成本月的實際工作日
+  function planSettings() {
+    return workdaysAuto() ? { ...settings, workdays: autoWorkdays(todayMonth()) } : settings;
+  }
+
+  // 開啟頁面時抓本年與明年的行事曆；抓到新資料就重新畫面
+  function ensureHolidays() {
+    const y = Number(todayMonth().slice(0, 4));
+    Promise.all([fetchHolidays(y), fetchHolidays(y + 1)]).then(results => {
+      if (results.some(Boolean)) onChange();
+    });
+  }
 
   /* ---------- 外觀：主題顏色、文字大小、版面自動修正（只存在這台裝置） ---------- */
 
@@ -1756,6 +1814,20 @@
   function initSettings() {
     const fill = () => {
       for (const k of Object.keys(C.DEFAULTS)) $(k).value = settings[k];
+      const auto = workdaysAuto();
+      $('workdaysAuto').checked = auto;
+      $('workdays').disabled = auto;
+      if (auto) $('workdays').value = autoWorkdays(todayMonth());
+      const year = todayMonth().slice(0, 4);
+      $('workdaysHint').textContent = !auto
+        ? '已關閉自動計算，請自行輸入工作日。'
+        : holidaySet(year)
+          ? `已套用 ${year} 年台灣行事曆，紅字假日不計入工作日。`
+          : '尚未取得台灣行事曆（需要網路），目前只扣掉週六日。';
+    };
+    $('workdaysAuto').onchange = ev => {
+      setWorkdaysAuto(ev.target.checked);
+      fill();
     };
     fill();
     onChange = () => {
@@ -1775,6 +1847,8 @@
       ev.preventDefault();
       const raw = {};
       for (const k of Object.keys(C.DEFAULTS)) raw[k] = $(k).value;
+      // 自動計算時，工作日不跟著表單走，保留原本儲存的數字
+      if (workdaysAuto()) raw.workdays = String(settings.workdays);
       const res = C.validateSettings(raw);
       if (!res.ok) {
         toast(res.message);
@@ -1827,6 +1901,7 @@
     } else {
       if (INITS[page]) INITS[page]();
       refreshFx();
+      ensureHolidays();
 
       // 開啟任何頁面時同步一次；切回這個分頁時也同步
       if (cloudReady()) syncNow();

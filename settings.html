@@ -48,6 +48,8 @@
       <div class="field"><label for="dailyLimit">每日生活費上限</label><input id="dailyLimit" type="number" inputmode="decimal" min="0" max="1000000" step="50" required></div>
       <div class="field"><label for="outing">每月朋友聚會預算</label><input id="outing" type="number" inputmode="decimal" min="0" max="10000000" step="100" required></div>
     </div>
+    <label class="check-row"><input id="workdaysAuto" type="checkbox"> 每月工作日自動計算（週一到週五，扣掉台灣國定假日）</label>
+    <p class="hint" id="workdaysHint"></p>
 
     <div class="actions">
       <button class="btn ghost" id="setReset" type="button">還原預設</button>
