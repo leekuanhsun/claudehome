@@ -54,7 +54,8 @@
       { name: '富邦刷卡', card: true },
     ],
     incomeCategories: ['薪資', '股票', '利息', '交易', '其他'],
-    incomeAccounts: ['銀行帳戶', '現金'],
+    // 帳戶：錢放在哪裡，餘額會隨記帳自動增減
+    accounts: ['現金', '永豐', '中信', 'KOKO', '郵局', '富邦'],
   };
   // 各類別預設的細項（餐飲的細項就是餐別）
   const PRESET_TAGS = {
@@ -215,7 +216,7 @@
       categories: sanitizeNames(raw.categories, PINNED_CATEGORIES) || d.categories,
       pays: sanitizePays(raw.pays) || d.pays,
       incomeCategories: sanitizeNames(raw.incomeCategories) || d.incomeCategories,
-      incomeAccounts: sanitizeNames(raw.incomeAccounts) || d.incomeAccounts,
+      accounts: sanitizeNames(raw.accounts) || d.accounts,
     };
   }
 
@@ -368,10 +369,14 @@
     const photos = (input.photos || []).filter(validPhoto).slice(0, MAX_PHOTOS);
     const location = validLocation(input.location);
     const pay = pickOr(lists.pays.map(p => p.name), input.pay, '現金');
+    // 刷卡的消費要等繳卡費時才從帳戶扣款，所以這裡不記帳戶
+    const account = isCardPay(pay, lists)
+      ? null
+      : pickOr(lists.accounts, input.account || (lists.accounts.includes(pay) ? pay : ''), lists.accounts[0]);
     return {
       ok: true,
       expense: {
-        id, date, amount, category, pay, note, meals, photos, location,
+        id, date, amount, category, pay, account, note, meals, photos, location,
         currency, origAmount, rate,
       },
     };
@@ -386,7 +391,7 @@
       return { ok: false, field: 'amount', message: '請輸入大於 0 的金額' };
     }
     const category = pickOr(lists.incomeCategories, input.category, '其他');
-    const account = pickOr(lists.incomeAccounts, input.account, '銀行帳戶');
+    const account = pickOr(lists.accounts, input.account, '現金');
     const note = String(input.note || '').trim().slice(0, MAX_NOTE);
     return {
       ok: true,
@@ -401,9 +406,77 @@
     return options[0];
   }
 
+  // 轉帳：從一個帳戶移到另一個帳戶，不算收入也不算支出
+  function buildTransfer(input, id, lists = DEFAULT_LISTS) {
+    const date = String(input.date || '');
+    if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
+    const amount = Math.round(Number(input.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) {
+      return { ok: false, field: 'amount', message: '請輸入大於 0 的金額' };
+    }
+    const from = pickOr(lists.accounts, input.account, lists.accounts[0]);
+    const to = pickOr(lists.accounts, input.toAccount, lists.accounts[1] || lists.accounts[0]);
+    if (from === to) return { ok: false, field: 'toAccount', message: '轉出與轉入不能是同一個帳戶' };
+    const note = String(input.note || '').trim().slice(0, MAX_NOTE);
+    return {
+      ok: true,
+      expense: { id, date, amount, type: 'transfer', category: '轉帳', account: from, toAccount: to, note },
+    };
+  }
+
+  // 更新餘額：輸入「目前的實際餘額」後，記下與原本餘額的差額（diff 可以是負數）
+  function buildAdjust(input, id, lists = DEFAULT_LISTS) {
+    const date = String(input.date || '');
+    if (!DATE_RE.test(date)) return { ok: false, field: 'date', message: '請選擇日期' };
+    const diff = Math.round(Number(input.diff) * 100) / 100;
+    if (!Number.isFinite(diff) || diff === 0) return { ok: false, field: 'amount', message: '餘額沒有變動' };
+    const amount = Math.abs(diff);
+    if (amount > MAX_AMOUNT) return { ok: false, field: 'amount', message: '金額太大' };
+    const account = pickOr(lists.accounts, input.account, lists.accounts[0]);
+    return {
+      ok: true,
+      expense: { id, date, amount, type: 'adjust', category: '更新餘額', account, dir: diff > 0 ? 1 : -1, note: '' },
+    };
+  }
+
   // 早期的紀錄沒有 type 欄位，一律視為支出
   function isIncome(e) {
     return e.type === 'income';
+  }
+
+  // 只有一般支出會計入生活費與支出統計（收入、轉帳、餘額調整都不算）
+  function isSpend(e) {
+    return !e.type;
+  }
+
+  // 每個帳戶目前的餘額：收入加入、支出與轉出扣除、更新餘額加上差額；刷卡消費要等繳卡費時才扣款
+  function accountBalances(expenses, lists = DEFAULT_LISTS) {
+    const used = expenses.flatMap(e => [e.account, e.toAccount]).filter(Boolean);
+    const names = namesWithExtras(lists.accounts, used);
+    const bal = Object.fromEntries(names.map(n => [n, 0]));
+    const add = (name, v) => {
+      if (name && name in bal) bal[name] += v;
+    };
+    for (const e of expenses) {
+      if (isIncome(e)) add(e.account, e.amount);
+      else if (e.type === 'transfer') {
+        add(e.account, -e.amount);
+        add(e.toAccount, e.amount);
+      } else if (e.type === 'adjust') add(e.account, e.dir * e.amount);
+      else if (isSpend(e) && !isCardPay(e.pay, lists)) {
+        // 早期的紀錄沒有帳戶：付款方式與帳戶同名時（例如「現金」）就從那個帳戶扣
+        const from = e.account || (lists.accounts.includes(e.pay) ? e.pay : null);
+        add(from, -e.amount);
+      }
+    }
+    return names.map(name => ({ name, balance: Math.round(bal[name] * 100) / 100 }));
+  }
+
+  // 圓餅圖用：只計算正的餘額，回傳每個帳戶的金額與占比
+  function accountShares(balances) {
+    const positive = balances.filter(b => b.balance > 0);
+    const total = positive.reduce((s, b) => s + b.balance, 0);
+    return positive.map(b => ({ name: b.name, value: b.balance, percent: total ? (b.balance / total) * 100 : 0 }));
   }
 
   // 清單之外的名稱（例如刪除前記的紀錄）也會列出來，金額才不會少算
@@ -413,7 +486,7 @@
 
   function monthSummary(expenses, month, lists = DEFAULT_LISTS) {
     const list = expenses.filter(e => monthOf(e.date) === month);
-    const spend = list.filter(e => !isIncome(e));
+    const spend = list.filter(isSpend);
     const income = list.filter(isIncome);
     const sum = (rows, pred) => rows.reduce((s, e) => (pred(e) ? s + e.amount : s), 0);
     const cardPay = sum(spend, e => e.category === CARD_PAYMENT);
@@ -445,7 +518,7 @@
 
   function daySummary(expenses, date, dailyLimit) {
     const spent = expenses
-      .filter(e => e.date === date && !isIncome(e) && e.category !== OUTING && e.category !== CARD_PAYMENT)
+      .filter(e => e.date === date && isSpend(e) && e.category !== OUTING && e.category !== CARD_PAYMENT)
       .reduce((s, e) => s + e.amount, 0);
     return {
       spent,
@@ -466,11 +539,11 @@
       ['日期', '類別', '餐別／細項', '付款方式', '備註', '金額（台幣）', '幣別', '原幣金額', '收支'],
       ...list.map(e => [
         e.date, e.category,
-        isIncome(e) ? '' : (e.meals || []).join('、'),
-        isIncome(e) ? e.account : (e.pay || ''),
+        isSpend(e) ? (e.meals || []).join('、') : '',
+        e.type === 'transfer' ? `${e.account}→${e.toAccount}` : (isIncome(e) || e.type === 'adjust' ? e.account : (e.pay || '')),
         e.note, e.amount,
         e.currency || '', e.currency && e.currency !== 'TWD' ? e.origAmount : '',
-        isIncome(e) ? '收入' : '支出',
+        { income: '收入', transfer: '轉帳', adjust: '餘額調整' }[e.type] || '支出',
       ]),
     ];
     return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
@@ -638,7 +711,12 @@
     validPhoto,
     buildExpense,
     buildIncome,
+    buildTransfer,
+    buildAdjust,
     isIncome,
+    isSpend,
+    accountBalances,
+    accountShares,
     CARD_PAYMENT,
     PINNED_CATEGORIES,
     DEFAULT_LISTS,

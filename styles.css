@@ -294,3 +294,10 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .add-row input[type=text]{flex:1;min-width:120px}
 .sum-neg{color:var(--red)}
 
+/* 帳戶頁 */
+.pie{display:block;width:min(240px,70vw);height:auto;margin:8px auto 12px}
+.legend{display:grid;gap:6px;font-size:14px}
+.legend-row{display:flex;align-items:center;gap:8px}
+.legend-dot{display:inline-block;width:12px;height:12px;border-radius:4px;flex:none}
+.acc-balance{font-weight:700;white-space:nowrap}
+

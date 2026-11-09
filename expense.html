@@ -19,6 +19,7 @@
       <a href="expense.html" data-tab="expense" aria-current="page"><span aria-hidden="true">✏️</span>記帳</a>
       <a href="diary.html" data-tab="diary"><span aria-hidden="true">📔</span>日記</a>
       <a href="history.html" data-tab="history"><span aria-hidden="true">📋</span>明細</a>
+      <a href="accounts.html" data-tab="accounts"><span aria-hidden="true">💳</span>帳戶</a>
       <a href="plan.html" data-tab="plan"><span aria-hidden="true">🌱</span>存錢計畫</a>
       <a href="settings.html" data-tab="settings"><span aria-hidden="true">⚙️</span>設定</a>
     </nav>
@@ -36,6 +37,7 @@
       <div class="kind-toggle" role="group" aria-label="記帳種類">
         <button class="chip" id="kindExpense" type="button" aria-pressed="true">支出</button>
         <button class="chip" id="kindIncome" type="button" aria-pressed="false">收入</button>
+        <button class="chip" id="kindTransfer" type="button" aria-pressed="false">轉帳</button>
       </div>
       <div class="form-grid">
         <div class="field"><label for="expDate">日期</label><input id="expDate" type="date" required></div>
@@ -48,6 +50,8 @@
         </div>
         <div class="field"><label for="expCategory">類別</label><select id="expCategory"></select></div>
         <div class="field"><label for="expPay" id="payLabel">付款方式</label><select id="expPay"></select></div>
+        <div class="field" id="accountField"><label for="expAccount">扣款帳戶</label><select id="expAccount"></select></div>
+        <div class="field" id="toAccountField" hidden><label for="expToAccount">轉入帳戶</label><select id="expToAccount"></select></div>
       </div>
 
       <div class="field" id="rateField" hidden>
