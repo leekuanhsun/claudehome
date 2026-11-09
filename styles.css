@@ -301,3 +301,6 @@ td.amount,th.amount{text-align:right;font-variant-numeric:tabular-nums}
 .legend-dot{display:inline-block;width:12px;height:12px;border-radius:4px;flex:none}
 .acc-balance{font-weight:700;white-space:nowrap}
 
+/* 外觀設定的按鈕樣式 */
+.kind-toggle .chip{flex:1}
+

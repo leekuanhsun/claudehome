@@ -1472,6 +1472,143 @@
 
   /* ---------- 設定 ---------- */
 
+  /* ---------- 外觀：主題顏色、文字大小、版面自動修正（只存在這台裝置） ---------- */
+
+  const APPEARANCE_KEY = 'savingPlan.v2.appearance';
+  const ACCENTS = ['#6f5fd0', '#2d6fb0', '#16805a', '#c07a1a', '#b23a52', '#3d9a9a'];
+  const TEXT_SCALES = [100, 115, 130];
+  const DEFAULT_APPEARANCE = { accent: '#6f5fd0', textScale: 100, autoFix: true };
+
+  function loadAppearance() {
+    try {
+      return { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY) || '{}') };
+    } catch {
+      return { ...DEFAULT_APPEARANCE };
+    }
+  }
+
+  function saveAppearance(a) {
+    try {
+      localStorage.setItem(APPEARANCE_KEY, JSON.stringify(a));
+    } catch {
+      toast('無法儲存外觀設定');
+    }
+  }
+
+  const isHex = s => /^#[0-9a-f]{6}$/i.test(s);
+
+  // 把兩個 #rrggbb 顏色依比例混合：amount 0 是 a，1 是 b
+  function mixHex(a, b, amount) {
+    const parts = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const A = parts(a);
+    const B = parts(b);
+    return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * amount).toString(16).padStart(2, '0')).join('');
+  }
+
+  function applyAppearance(a = loadAppearance()) {
+    const root = document.documentElement;
+    const accent = isHex(a.accent) ? a.accent : DEFAULT_APPEARANCE.accent;
+    root.style.setProperty('--purple', accent);
+    root.style.setProperty('--purple-soft', mixHex(accent, '#ffffff', 0.88));
+    root.style.setProperty('--ink', mixHex(accent, '#000000', 0.55));
+    const scale = TEXT_SCALES.includes(a.textScale) ? a.textScale : 100;
+    document.body.style.zoom = scale === 100 ? '' : String(scale / 100);
+  }
+
+  // 版面自動修正：找出超出螢幕寬度的元素；所在的格狀排版改成單欄，長文字自動換行
+  function layoutGuard() {
+    for (const el of document.querySelectorAll('[data-autofix]')) {
+      el.style.removeProperty('grid-template-columns');
+      el.style.removeProperty('min-width');
+      el.style.removeProperty('max-width');
+      el.style.removeProperty('overflow-wrap');
+      el.removeAttribute('data-autofix');
+    }
+    if (!loadAppearance().autoFix) return 0;
+    const W = document.documentElement.clientWidth;
+    const grids = new Set();
+    let fixes = 0;
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.closest('.table-wrap,.tabs,.thumbs,[hidden]')) continue;
+      if (getComputedStyle(el).display === 'none') continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || r.right <= W + 1) continue;
+      const parent = el.parentElement;
+      if (parent && getComputedStyle(parent).display.includes('grid') && !grids.has(parent)) {
+        grids.add(parent);
+        parent.style.gridTemplateColumns = 'minmax(0,1fr)';
+        parent.dataset.autofix = '';
+        fixes++;
+      }
+      el.style.minWidth = '0';
+      el.style.maxWidth = '100%';
+      el.style.overflowWrap = 'anywhere';
+      el.dataset.autofix = '';
+    }
+    return fixes;
+  }
+
+  let layoutTimer = null;
+  function scheduleLayoutGuard() {
+    clearTimeout(layoutTimer);
+    layoutTimer = setTimeout(layoutGuard, 150);
+  }
+
+  function initLayoutGuard() {
+    window.addEventListener('resize', scheduleLayoutGuard);
+    window.addEventListener('orientationchange', scheduleLayoutGuard);
+    // 頁面內容變動（例如清單重畫）後再檢查一次；只看新增或移除的子元素，修正時不會重複觸發
+    new MutationObserver(scheduleLayoutGuard).observe(document.body, { childList: true, subtree: true });
+    layoutGuard();
+  }
+
+  function initAppearance() {
+    const render = () => {
+      const a = loadAppearance();
+      const swatches = $('accentChoices');
+      swatches.textContent = '';
+      for (const c of ACCENTS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.style.background = c;
+        b.setAttribute('aria-label', `主題顏色 ${c}`);
+        b.setAttribute('aria-pressed', String(c === a.accent));
+        b.onclick = () => setAppearance({ accent: c });
+        swatches.appendChild(b);
+      }
+      $('accentPicker').value = a.accent;
+      const scales = $('textScaleChoices');
+      scales.textContent = '';
+      for (const t of TEXT_SCALES) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = t === 100 ? '標準' : t === 115 ? '大' : '特大';
+        b.setAttribute('aria-pressed', String(t === a.textScale));
+        b.onclick = () => setAppearance({ textScale: t });
+        scales.appendChild(b);
+      }
+      $('autoFixToggle').checked = a.autoFix;
+      $('autoFixStatus').textContent = a.autoFix
+        ? `版面自動修正已開啟，目前這一頁修正了 ${layoutGuard()} 處。`
+        : '版面自動修正已關閉。';
+    };
+    const setAppearance = patch => {
+      saveAppearance({ ...loadAppearance(), ...patch });
+      applyAppearance();
+      render();
+    };
+    $('accentPicker').addEventListener('input', ev => setAppearance({ accent: ev.target.value }));
+    $('autoFixToggle').onchange = ev => setAppearance({ autoFix: ev.target.checked });
+    $('appearanceReset').onclick = () => {
+      saveAppearance({ ...DEFAULT_APPEARANCE });
+      applyAppearance();
+      render();
+      toast('已恢復預設外觀');
+    };
+    render();
+  }
+
   /* ---------- 記帳項目設定（類別、付款方式、收入類別與帳戶） ---------- */
 
   const LIST_SECTIONS = [
@@ -1625,6 +1762,7 @@
       fill();
       renderListsEditor();
     };
+    initAppearance();
     initListsEditor();
     initCloudPanel();
 
@@ -1665,6 +1803,10 @@
     plan: initPlan,
     settings: initSettings,
   };
+
+  // 外觀與版面修正在每一頁都要套用，包括登入頁
+  applyAppearance();
+  initLayoutGuard();
 
   // 設定了雲端同步時，沒有登入就只能看登入頁，別人看不到這台裝置上的資料
   const locked = cloudReady() && !SavingPlanCloud.currentUser();

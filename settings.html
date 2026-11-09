@@ -55,6 +55,19 @@
     </div>
   </form>
 
+  <section class="card" id="appearanceBox">
+    <h2>外觀</h2>
+    <p class="muted">這些設定只套用在這台裝置，不會同步到其他裝置。</p>
+    <p class="label-s">主題顏色</p>
+    <div class="color-choices" id="accentChoices"></div>
+    <div class="field"><label for="accentPicker">自訂顏色</label><input id="accentPicker" type="color"></div>
+    <p class="label-s">文字大小</p>
+    <div class="kind-toggle" id="textScaleChoices"></div>
+    <label class="check-row"><input id="autoFixToggle" type="checkbox"> 自動修正版面（格子超出螢幕時改成單欄、長文字自動換行）</label>
+    <p class="hint" id="autoFixStatus"></p>
+    <div class="actions"><button class="btn ghost" id="appearanceReset" type="button">恢復預設外觀</button></div>
+  </section>
+
   <section class="card" id="listsBox">
     <h2>記帳項目</h2>
     <p class="muted">可以自行新增、改名或刪除。改名會套用到之前的紀錄。標示「固定」的項目是系統計算要用的，不能改名或刪除。</p>
