@@ -141,6 +141,31 @@
   }
 
   // 信用卡本金為 0 代表已繳清，之後不再扣月付金額
+  // 某個月的工作日數：週一到週五，扣掉行事曆上的假日（holidays 是 'YYYY-MM-DD' 的集合）
+  function workdaysIn(month, holidays = new Set()) {
+    const [y, m] = month.split('-').map(Number);
+    const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    let n = 0;
+    for (let d = 1; d <= days; d++) {
+      const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+      if (dow !== 0 && dow !== 6 && !holidays.has(iso)) n++;
+    }
+    return n;
+  }
+
+  // 台灣行事曆的格式：[{date: '20260101', isHoliday: true, description: '…'}, …]；只取紅字（isHoliday）的日期
+  function holidaysFromCalendar(rows) {
+    if (!Array.isArray(rows)) return null;
+    const out = [];
+    for (const r of rows) {
+      if (!r || r.isHoliday !== true || !/^\d{8}$/.test(String(r.date))) continue;
+      const d = String(r.date);
+      out.push(`${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`);
+    }
+    return out;
+  }
+
   function effectiveCardPay(s) {
     return s.cardBalance > 0 ? s.cardPay : 0;
   }
@@ -706,6 +731,8 @@
     sanitizeSettings,
     validateSettings,
     effectiveCardPay,
+    workdaysIn,
+    holidaysFromCalendar,
     plan,
     isValidExpense,
     validPhoto,
